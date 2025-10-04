@@ -1,0 +1,38 @@
+{
+  "name": "toolhub",
+  "version": "0.1.0",
+  "description": "ToolHub - collection of simple web tools for students, freelancers and SMBs (demo freemium + ATS)",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "frontend": "live-server frontend/public --port=5173 --no-browser",
+    "dev:all": "concurrently \"npm run dev\" \"npm run frontend\"",
+    "smoke": "node scripts/smoke.js"
+  },
+  "keywords": [
+    "tools",
+    "freemium",
+    "pdf",
+    "bmi",
+    "flashcards",
+    "convert"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^3.3.2",
+    "pdfkit": "^0.13.0",
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "live-server": "^1.2.2",
+    "nodemon": "^2.0.22"
+  }
+}

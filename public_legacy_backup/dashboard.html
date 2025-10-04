@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ToolHub Dashboard (Demo)</title>
+    <style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:8px}</style>
+  </head>
+  <body>
+    <h1>Analytics demo</h1>
+    <div id="content">Caricamento...</div>
+    <script>
+      fetch('/api/analytics').then(r=>r.json()).then(json=>{
+        const c = document.getElementById('content');
+        let html = '<h2>Uso strumenti</h2><table><tr><th>Tool</th><th>Usi</th></tr>';
+        json.usage.forEach(u=> html += `<tr><td>${u.tool_key}</td><td>${u.uses}</td></tr>`);
+        html += '</table>';
+        html += '<h2>Download</h2><table><tr><th>Tool</th><th>Downloads</th></tr>';
+        json.downloads.forEach(d=> html += `<tr><td>${d.tool_key}</td><td>${d.downloads}</td></tr>`);
+        html += '</table>';
+        html += '<h2>Eventi A/B</h2><table><tr><th>Variant</th><th>Evento</th><th>Count</th></tr>';
+        (json.events||[]).forEach(ev=> html += `<tr><td>${ev.variant}</td><td>${ev.event}</td><td>${ev.cnt}</td></tr>`);
+        html += '</table>';
+        const upgrades = (json.events||[]).filter(e=> e.event==='upgrade_click').reduce((acc,e)=>{acc[e.variant]=(acc[e.variant]||0)+e.cnt;return acc;},{});
+        html += '<h3>Conversioni Upgrade (upgrade_click)</h3><ul>' + Object.entries(upgrades).map(([v,cnt])=>`<li>${v}: ${cnt}</li>`).join('') + '</ul>';
+        html += `<p>Waitlist totale: ${json.waitlist} | Messaggi supporto: ${json.messages}</p>`;
+        c.innerHTML = html;
+      }).catch(e=>document.getElementById('content').innerText = 'Errore: '+e.message);
+    </script>
+  </body>
+</html>

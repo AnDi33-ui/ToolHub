@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ToolHub - Strumenti utili</title>
+    <link rel="stylesheet" href="/style.css" />
+    <!-- React UMD + Babel for in-browser JSX (demo only) -->
+    <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  </head>
+  <body>
+    <nav class="navbar">
+      <div class="logo">ToolHub</div>
+      <ul class="navlinks">
+        <li><a href="#">Home</a></li>
+        <li><a href="#tools">Tools</a></li>
+        <li><a href="#pro">Pro</a></li>
+        <li><a href="#contact">Contatti</a></li>
+      </ul>
+    </nav>
+
+    <main id="root"></main>
+    <section id="prossimamente" class="mt-lg fade-in" style="max-width:1280px;margin:0 auto;padding:0 clamp(16px,5vw,64px);">
+      <h2 style="margin:0 0 12px;font-size:1.6rem">Prossimamente</h2>
+      <ul class="coming-list">
+        <li class="coming-item">Calendarizzatore social media (Pro)</li>
+        <li class="coming-item">Generatore di fatture con template brand (Pro)</li>
+        <li class="coming-item">Esportazione Flashcard in Anki format</li>
+        <li class="coming-item">API privata per automazioni aziendali (Pro Business)</li>
+      </ul>
+    </section>
+    <section id="contact" class="mt-lg fade-in" style="max-width:1280px;margin:0 auto;padding:40px clamp(16px,5vw,64px);">
+      <h2 style="margin:0 0 12px;font-size:1.6rem">Contatti & Supporto</h2>
+      <p style="margin:0 0 18px;color:var(--text-light);max-width:640px">Hai feedback, richieste di strumenti o vuoi testare la versione Pro? Inviaci un messaggio o unisciti alla waitlist.</p>
+      <form id="contact-form" class="fade-in" style="max-width:520px;display:grid;gap:14px">
+        <input name="email" type="email" placeholder="La tua email" required />
+        <textarea name="message" rows="4" placeholder="Messaggio / feedback" required></textarea>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn" type="submit">Invia</button>
+          <button type="button" class="btn secondary" id="join-waitlist">Join Waitlist Pro</button>
+        </div>
+        <div id="contact-status" style="font-size:.75rem;color:var(--text-light)"></div>
+      </form>
+    </section>
+
+    <footer>
+      <div class="cols">
+        <div>
+          <strong>ToolHub</strong><br />
+          <span style="font-size:.7rem">Freemium toolkit per produttività quotidiana.</span>
+        </div>
+        <div>
+          <strong>Link</strong><br />
+          <a href="#tools">Tools</a><br />
+          <a href="#prossimamente">Prossimamente</a><br />
+          <a href="#contact">Contatti</a>
+        </div>
+        <div>
+          <strong>Social</strong><br />
+          <a href="#" class="share-link" data-net="twitter">Twitter</a><br />
+          <a href="#" class="share-link" data-net="linkedin">LinkedIn</a><br />
+          <a href="#" class="share-link" data-net="facebook">Facebook</a>
+        </div>
+        <div>
+          <strong>Legale</strong><br />
+          <a href="#">Privacy</a><br />
+          <a href="#">Termini</a>
+        </div>
+      </div>
+      <div>© <span id="year"></span> ToolHub – Demo. Tutti i diritti riservati.</div>
+    </footer>
+    <button class="btn secondary theme-toggle" id="themeToggle" aria-label="Toggle dark mode">🌗</button>
+
+    <!-- Tool components (JSX) - loaded as modules for demo -->
+    <script type="text/babel" src="/tools/PdfJpgTool.js"></script>
+    <script type="text/babel" src="/tools/BmiTool.js"></script>
+    <script type="text/babel" src="/tools/QuoteTool.js"></script>
+    <script type="text/babel" src="/tools/FlashcardTool.js"></script>
+    <script type="text/babel" src="/tools/TaxesTool.js"></script>
+    <script type="text/babel" src="/script.js"></script>
+  </body>
+</html>

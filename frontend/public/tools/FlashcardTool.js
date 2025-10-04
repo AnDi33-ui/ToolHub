@@ -1,0 +1,16 @@
+// Migrated FlashcardTool
+function FlashcardTool(){
+  const API_BASE = (window.API_BASE || (location.port==='5173'?'http://localhost:3000':'')).replace(/\/$/,'');
+  const [cards,setCards] = React.useState([{front:'Q1',back:'A1'}]);
+  const [syncJson,setSyncJson] = React.useState('');
+  const [msg,setMsg] = React.useState('');
+  React.useEffect(()=>{ setSyncJson(JSON.stringify(cards,null,2)); },[cards]);
+  function addCard(){ setCards(prev=> [...prev,{front:'',back:''}]); }
+  function update(i,field,val){ setCards(prev=> prev.map((c,idx)=> idx===i? {...c,[field]:val}:c)); }
+  function remove(i){ setCards(prev=> prev.filter((_,idx)=> idx!==i)); }
+  function importJson(){ try { const parsed = JSON.parse(syncJson); if(Array.isArray(parsed)) setCards(parsed); else setMsg('JSON non valido (array richiesto)'); } catch(err){ setMsg('Errore parse JSON: '+err.message); } }
+  function exportJSON(){ const blob = new Blob([JSON.stringify(cards,null,2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='flashcards.json'; a.click(); URL.revokeObjectURL(url); }
+  async function exportPDF(){ setMsg('Generazione PDF...'); try{ const r = await fetch(API_BASE + '/api/export/flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cards})}); if(!r.ok){ let j={}; try{ j=await r.json(); }catch(e){} setMsg('Errore: '+(j.error||r.status)); return; } const blob = await r.blob(); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='flashcards.pdf'; a.click(); URL.revokeObjectURL(url); setMsg('PDF pronto'); }catch(err){ setMsg('Errore rete: '+err.message); } }
+  return (<div className="card"><h3>Flashcard generator</h3><p style={{fontSize:12,opacity:.7,margin:'4px 0 10px'}}>Crea rapidamente flashcard domanda/risposta. Puoi esportare in JSON oppure PDF per stampa. Suggerimento: mantieni le domande concise e una sola risposta diretta.</p><div style={{display:'grid',gap:12}}>{cards.map((c,i)=>(<div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr 34px',gap:8}}><input placeholder="Fronte" value={c.front} onChange={e=>update(i,'front',e.target.value)} /><input placeholder="Retro" value={c.back} onChange={e=>update(i,'back',e.target.value)} /><button type="button" className="btn secondary" style={{padding:'6px 8px'}} onClick={()=>remove(i)}>✕</button></div>))}<button className="btn outline" type="button" onClick={addCard}>+ Aggiungi card</button></div><details style={{marginTop:14}}><summary style={{cursor:'pointer',fontSize:'.75rem',opacity:.7}}>JSON sync (import / export manuale)</summary><textarea rows={6} style={{width:'100%',marginTop:8}} value={syncJson} onChange={e=>setSyncJson(e.target.value)} /><div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}><button className="btn secondary" type="button" onClick={importJson}>Importa JSON</button><button className="btn" type="button" onClick={exportJSON}>Esporta JSON</button><button className="btn" type="button" onClick={exportPDF}>Esporta PDF</button></div></details><div style={{marginTop:10,fontSize:'.7rem',color:'#64748b'}}>{msg}</div></div>);
+}
+window.FlashcardTool = FlashcardTool;
