@@ -4,6 +4,7 @@
 // Shared utilities
 import { apiFetch, ApiError, track } from '../shared/api.js';
 import { currencyFormat, numberFormat } from '../shared/format.js';
+import ProfileEditor from '../shared/ui/ProfileEditor.jsx';
 
 export function InvoiceTool(){
   const API_BASE = (window.API_BASE || (location.port==='5173'? 'http://localhost:3000':'')).replace(/\/$/,'');
@@ -27,6 +28,7 @@ export function InvoiceTool(){
   const noClients = clients.length===0;
   const [loadingData,setLoadingData] = React.useState(true);
   const [profile,setProfile] = React.useState(null);
+  const [profileEditorOpen,setProfileEditorOpen] = React.useState(false);
 
   function updateItem(id,field,val){ setItems(prev=> prev.map(it=> it.id===id? {...it,[field]: field==='desc'? val : Number(val)}:it)); }
   function addItem(){ setItems(prev=> [...prev,{id:Math.random().toString(36).slice(2),desc:'',qty:1,price:0}]); }
@@ -67,7 +69,7 @@ export function InvoiceTool(){
   React.useEffect(()=>{ if(authChecked && !loginRequired && clients.length===0){ setShowClientForm(true); setClientId(''); } },[clients,authChecked,loginRequired]);
 
   return <div className="tool-layout">
-    <h2 style={{marginTop:0}}>Fatture (Build)</h2>
+    <h2 style={{marginTop:0,display:'flex',alignItems:'center',gap:12}}>Fatture (Build) <button className="btn secondary" style={{fontSize:'.6rem'}} onClick={()=>setProfileEditorOpen(true)}>Profilo</button></h2>
     <div style={{display:'grid',gap:18,gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',alignItems:'start'}}>
       <div className="card" style={{display:'grid',gap:10}}>
         <h3 style={{margin:0,fontSize:'.9rem'}}>Cliente</h3>
@@ -115,6 +117,7 @@ export function InvoiceTool(){
         </div>
       </div>
     </div>
+    {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={(p)=>{ setProfile(p); setProfileEditorOpen(false); loadProfile(); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
   </div>;
 }
 

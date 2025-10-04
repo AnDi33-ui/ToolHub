@@ -1,6 +1,7 @@
 /* global React */
 import { currencyFormat, percentFormat } from '../shared/format';
 import { track } from '../shared/api';
+import ProfileEditor from '../shared/ui/ProfileEditor.jsx';
 
 /* TaxesTool React version
    Enhancements:
@@ -32,6 +33,7 @@ export default function TaxesTool(){
   const [results,setResults] = useState(null);
   const [msg,setMsg] = useState('');
   const [profile,setProfile] = useState(null);
+  const [profileEditorOpen,setProfileEditorOpen] = useState(false);
 
   function toast(t){ if(window.ToolHubToast){ window.ToolHubToast(t); } else setMsg(t); }
 
@@ -47,7 +49,10 @@ export default function TaxesTool(){
 
   return (
     <div className="card">
-      <h3>Calcolatore tasse freelance</h3>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <h3 style={{margin:0}}>Calcolatore tasse freelance</h3>
+        <button className="btn secondary" style={{fontSize:'.55rem'}} onClick={()=>setProfileEditorOpen(true)}>Profilo</button>
+      </div>
       <p style={{fontSize:12,opacity:.7,margin:'4px 0 10px'}}>Stima indicativa. Confronta rapidamente regimi diversi.</p>
       <div style={{display:'grid',gap:8}}>
         <input placeholder="Reddito annuo (€)" value={income} onChange={e=>setIncome(e.target.value)} />
@@ -94,6 +99,7 @@ export default function TaxesTool(){
         </ul>
       </details>
       <div style={{marginTop:8,fontSize:10,color:'#64748b'}}>{msg}</div>
+      {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={(p)=>{ setProfile(p); setProfileEditorOpen(false); if(p?.regime_fiscale) setFocusRegime(p.regime_fiscale); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
     </div>
   );
 }

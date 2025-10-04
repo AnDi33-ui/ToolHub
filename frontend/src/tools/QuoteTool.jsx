@@ -2,6 +2,7 @@
 /* global React */
 import { apiFetch, track } from '../shared/api.js';
 import { currencyFormat } from '../shared/format.js';
+import ProfileEditor from '../shared/ui/ProfileEditor.jsx';
 
 export function QuoteTool(){
   const API_BASE = (window.API_BASE || (location.port==='5173'?'http://localhost:3000':''));
@@ -22,6 +23,7 @@ export function QuoteTool(){
   const [highDiscConfirmed,setHighDiscConfirmed] = React.useState(false);
   const [loadingTemplates,setLoadingTemplates] = React.useState(false);
   const [profile,setProfile] = React.useState(null);
+  const [profileEditorOpen,setProfileEditorOpen] = React.useState(false);
   React.useEffect(()=>{ apiFetch('/api/auth/me').then(j=>{ if(j.ok) setUser(j.user); }).catch(()=>{}); },[]);
   React.useEffect(()=>{ if(user){ apiFetch('/api/profile').then(j=>{ if(j.ok && j.profile){ setProfile(j.profile); if(j.profile.aliquota_iva_default!=null) setVat(j.profile.aliquota_iva_default); if(j.profile.currency_default) setCurrency(j.profile.currency_default); if(j.profile.note_footer_default && !note) setNote(j.profile.note_footer_default); if(j.profile.ragione_sociale) setCompany(c=>({...c,name:j.profile.ragione_sociale})); if(j.profile.indirizzo) setCompany(c=>({...c,address:j.profile.indirizzo})); } }).catch(()=>{}); } },[user]);
   function addItem(){ setItems(prev=> [...prev,{desc:'',qty:1,price:0}]); }
@@ -38,7 +40,7 @@ export function QuoteTool(){
   const { subtotal, disc, vatAmount, total } = totals();
   const convHint = convertTo && !rateOverride ? (<div style={{fontSize:10,opacity:.6}}>Conversione finale lato server ({convertTo})</div>) : null;
   return <div className="card">
-    <h3>Generatore di preventivi PDF</h3>
+    <h3 style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>Generatore di preventivi PDF <button className="btn secondary" style={{fontSize:'.55rem'}} onClick={()=>setProfileEditorOpen(true)}>Profilo</button></h3>
     <p style={{fontSize:12,opacity:.7,margin:'4px 0 10px'}}>Crea preventivi professionali con logo, sconto, IVA e valuta. I dati restano temporanei nel browser.</p>
     <div style={{display:'grid',gap:12}}>
       <details open>
@@ -119,6 +121,7 @@ export function QuoteTool(){
       </div>
       {error && <div style={{color:'red',fontSize:12}}>{error}</div>}
     </div>
+    {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={(p)=>{ setProfile(p); setProfileEditorOpen(false); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
   </div>;
 }
 export default QuoteTool;
