@@ -17,7 +17,8 @@ export function ProfileEditor({ profile, onClose, onSaved }){
     regime_fiscale: profile?.regime_fiscale || 'forfettario',
     aliquota_iva_default: profile?.aliquota_iva_default ?? 22,
     currency_default: profile?.currency_default || 'EUR',
-    note_footer_default: profile?.note_footer_default || ''
+    note_footer_default: profile?.note_footer_default || '',
+    invoice_number_format: profile?.invoice_number_format || ''
   }));
   const [saving,setSaving] = React.useState(false);
   const [error,setError] = React.useState('');
@@ -139,6 +140,12 @@ export function ProfileEditor({ profile, onClose, onSaved }){
               <option value="GBP">GBP</option>
             </select>
             <input placeholder="Nota footer (breve)" value={form.note_footer_default} onChange={e=>update('note_footer_default',e.target.value)} />
+          </div>
+          <div>
+            <input placeholder="Formato numerazione fatture (es {{year}}-{{seq:4}} o {{year}}-{{company.piva:4}}-{{seq:3}})" value={form.invoice_number_format} onChange={e=>update('invoice_number_format',e.target.value)} />
+            <small style={{fontSize:10,color:'#555'}}>
+              Placeholders: {'{{year}}'}, {'{{seq}}'}, {'{{seq:N}}'}, {'{{company.piva}}'}, {'{{company.piva:N}}'}. Lascia vuoto per default.
+            </small>
           </div>
           {error && <div style={{color:'red',fontSize:12}}>{error}</div>}
           {saved && !error && <div style={{color:'#16a34a',fontSize:12}}>Salvato ✔</div>}

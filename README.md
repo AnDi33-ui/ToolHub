@@ -116,3 +116,57 @@ Il file risultante conterrà tre sezioni (# usage, # downloads, # ab_events).
 - Persistenza tassi di cambio (API esterna) e caching.
 - Ruoli / RBAC per strumenti avanzati.
 - Webhook / integrazione fatturazione reale.
+
+## Fatture: Numerazione & Versioning (nuovo)
+
+### Numerazione configurabile
+Nel profilo business è possibile settare il campo `invoice_number_format` per controllare il formato del numero fattura. Se vuoto viene usato il default `{{year}}-{{seq:4}}`.
+
+Placeholders supportati:
+- `{{year}}` – anno corrente a 4 cifre
+- `{{seq}}` – numero progressivo (senza padding)
+- `{{seq:N}}` – numero progressivo con padding a N cifre (max 8)
+- `{{company.piva}}` – P.IVA completa (caratteri non alfanumerici filtrati)
+- `{{company.piva:N}}` – ultime N cifre/caratteri della P.IVA (es: P.IVA=12345678901 e N=4 -> 8901)
+
+Caratteri letterali consentiti fuori dai placeholder: lettere, numeri, `- _ /`.
+Se il pattern contiene placeholder o caratteri non ammessi viene ignorato e si ricade sul default.
+
+Reset annuale: alla prima fattura di un nuovo anno il contatore (seq) riparte da 1 automaticamente (`users.last_invoice_year` + `last_invoice_seq`).
+
+Esempi:
+| Pattern | Output (anno 2025, seq=7, P.IVA=12345678901) |
+|---------|----------------------------------------------|
+| `{{year}}-{{seq:4}}` | `2025-0007` |
+| `INV/{{year}}/{{seq:3}}` | `INV/2025/007` |
+| `{{year}}-{{company.piva:4}}-{{seq:2}}` | `2025-8901-07` |
+
+### Versioning fatture
+Ogni fattura ha una tabella storica `invoice_versions` con snapshot immutabili del payload logico (righe, aliquota, note, ecc.).
+Alla creazione viene salvata la versione 1.
+Un revert genera sempre una NUOVA versione (non sovrascrive le precedenti) copiando il payload della versione scelta.
+Il PDF (`/api/invoices/:id/pdf`) viene sempre generato dall'ULTIMA versione disponibile (non dal campo `invoices.payload` se diverge).
+
+### Lock
+Endpoint di lock imposta `locked_at` e blocca nuovi revert o modifiche a quella fattura.
+
+### Endpoints
+| Endpoint | Metodo | Note |
+|----------|--------|------|
+| `/api/invoices` | POST | Crea fattura, genera numero da pattern e salva versione 1 |
+| `/api/invoices/:id/history` | GET | Lista versioni (id, version, created_at) |
+| `/api/invoices/:id/version/:v` | GET | Payload JSON della versione v |
+| `/api/invoices/:id/revert` | POST | Body: `{"version":N}` crea nuova versione clonando N (bloccato se locked) |
+| `/api/invoices/:id/lock` | PATCH | Blocca la fattura (imposta `locked_at`) |
+| `/api/invoices/:id/pdf` | GET | PDF dalla snapshot più recente |
+
+### UI (tool Fatture)
+- Bottone "History" su ogni fattura mostra elenco versioni, payload e azione revert→new.
+- Bottone "Blocca fattura" disponibile finché non esiste `locked_at`.
+- Campo "Formato numerazione fatture" nel pannello Profilo.
+
+### Considerazioni future
+- Aggiungere editing interattivo fattura + creazione nuova versione anche da UI (non solo revert).
+- Firma digitale / hash della snapshot per auditing.
+- Numerazione multi-serie (es. per reparti) con placeholder aggiuntivo.
+

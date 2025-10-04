@@ -208,26 +208,29 @@ function formatMoney(amount,currency='EUR'){ try{ return new Intl.NumberFormat('
 
 // --- Invoice Numbering & Versioning Helpers ---
 const INVOICE_NUMBER_PATTERN_DEFAULT='{{year}}-{{seq:4}}';
+// Allowed placeholders now: {{year}} {{seq}} {{seq:N}} {{company.piva}} {{company.piva:N}}
 function validateInvoicePattern(p){
   if(!p || typeof p!=='string') return false;
-  // Allowed chars outside placeholders: letters, digits, - _ /
-  // Placeholders: {{year}} {{seq}} {{seq:N}}
-  const placeholderRe=/{{\s*(year|seq(?::\d+)?)\s*}}/g;
-  // Quick structural validation: remove placeholders then check remaining chars
+  const placeholderRe=/{{\s*(year|seq(?::\d+)?|company\.piva(?::\d+)?)\s*}}/g;
   const stripped = p.replace(placeholderRe,'');
   if(!/^[A-Za-z0-9\-_/]*$/.test(stripped)) return false;
-  // Ensure all placeholders valid
-  let m; placeholderRe.lastIndex=0; while((m=placeholderRe.exec(p))){ /* already validated by regex */ }
+  let m; placeholderRe.lastIndex=0; while((m=placeholderRe.exec(p))){ /* each match already validated */ }
   return true;
 }
-function generateInvoiceNumber(pattern, year, seq){
+function generateInvoiceNumber(pattern, year, seq, opts={}){
   const pat = validateInvoicePattern(pattern)? pattern : INVOICE_NUMBER_PATTERN_DEFAULT;
-  return pat.replace(/{{\s*(year|seq(?::\d+)?)\s*}}/g,(m, key)=>{
+  const pivaRaw = (opts.companyPiva||'').replace(/[^0-9A-Z]/gi,'');
+  return pat.replace(/{{\s*(year|seq(?::\d+)?|company\.piva(?::\d+)?)\s*}}/g,(m, key)=>{
     if(key.startsWith('year')) return String(year);
     if(key.startsWith('seq')){
       const parts=key.split(':');
       if(parts.length===2){ const width = Math.min(parseInt(parts[1],10)||0,8); return width>0? String(seq).padStart(width,'0'): String(seq); }
       return String(seq);
+    }
+    if(key.startsWith('company.piva')){
+      const parts=key.split(':');
+      if(parts.length===2){ const take = parseInt(parts[1],10)||0; if(take>0) return pivaRaw.slice(-take) || ''; }
+      return pivaRaw;
     }
     return '';
   });
@@ -627,9 +630,9 @@ app.post('/api/invoices', requireUser, async (req,res)=>{
     const urow = await allAsync('SELECT last_invoice_seq,last_invoice_year FROM users WHERE id=?',[req.userId]);
     const seq = urow[0].last_invoice_seq || 1;
     // fetch invoice number format
-    const prof = await allAsync('SELECT invoice_number_format FROM business_profile WHERE user_id=?',[req.userId]);
-    const pattern = prof[0]?.invoice_number_format || null;
-    const number = generateInvoiceNumber(pattern, year, seq);
+  const prof = await allAsync('SELECT invoice_number_format,piva FROM business_profile WHERE user_id=?',[req.userId]);
+  const pattern = prof[0]?.invoice_number_format || null;
+  const number = generateInvoiceNumber(pattern, year, seq, { companyPiva: prof[0]?.piva || '' });
     let subtotal=0; (items||[]).forEach(it=>{ subtotal += (Number(it.qty)||0)*(Number(it.price)||0); });
     const tax = subtotal * (Number(taxRate)||0)/100; const total=subtotal+tax;
     const payload = { clientId, items, taxRate, currency, notes };
@@ -643,16 +646,74 @@ app.get('/api/invoices', requireUser, async (req,res)=>{
   try { const rows=await allAsync('SELECT id,number,total,currency,status,created_at FROM invoices WHERE user_id=? ORDER BY created_at DESC',[req.userId]); res.json({ok:true,items:rows}); } catch(e){ res.status(500).json({ok:false,error:e.message}); }
 });
 app.get('/api/invoices/:id', requireUser, async (req,res)=>{
-  try { const rows=await allAsync('SELECT * FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]); if(!rows.length) return res.status(404).json({ok:false,error:'not found'}); const inv=rows[0]; let payload={}; try{ payload=JSON.parse(inv.payload);}catch{} res.json({ok:true,invoice:{ id:inv.id, number:inv.number, total:inv.total, currency:inv.currency, status:inv.status, created_at:inv.created_at, payload }}); } catch(e){ res.status(500).json({ok:false,error:e.message}); }
+  try { const rows=await allAsync('SELECT * FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]); if(!rows.length) return res.status(404).json({ok:false,error:'not found'}); const inv=rows[0]; let payload={}; try{ payload=JSON.parse(inv.payload);}catch{} res.json({ok:true,invoice:{ id:inv.id, number:inv.number, total:inv.total, currency:inv.currency, status:inv.status, created_at:inv.created_at, locked_at:inv.locked_at, payload }}); } catch(e){ res.status(500).json({ok:false,error:e.message}); }
+});
+// Invoice versions history
+app.get('/api/invoices/:id/history', requireUser, async (req,res)=>{
+  try {
+    const invRows = await allAsync('SELECT id FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]);
+    if(!invRows.length) return res.status(404).json({ok:false,error:'not found'});
+    const versions = await allAsync('SELECT id,version,created_at FROM invoice_versions WHERE invoice_id=? ORDER BY version ASC',[req.params.id]);
+    res.json({ok:true, invoice_id:Number(req.params.id), versions});
+  } catch(e){ res.status(500).json({ok:false,error:e.message}); }
+});
+// View single version payload
+app.get('/api/invoices/:id/version/:v', requireUser, async (req,res)=>{
+  try {
+    const invRows = await allAsync('SELECT id FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]);
+    if(!invRows.length) return res.status(404).json({ok:false,error:'not found'});
+    const vNum = parseInt(req.params.v,10); if(!vNum || vNum<1) return res.status(400).json({ok:false,error:'invalid version'});
+    const rows = await allAsync('SELECT id,version,payload_json,created_at FROM invoice_versions WHERE invoice_id=? AND version=?',[req.params.id,vNum]);
+    if(!rows.length) return res.status(404).json({ok:false,error:'version not found'});
+    let payload={}; try{ payload=JSON.parse(rows[0].payload_json);}catch{}
+    res.json({ok:true, invoice_id:Number(req.params.id), version: rows[0].version, created_at: rows[0].created_at, payload });
+  } catch(e){ res.status(500).json({ok:false,error:e.message}); }
+});
+// Revert (create new version from old version payload)
+app.post('/api/invoices/:id/revert', requireUser, async (req,res)=>{
+  try {
+    const { version } = req.body||{};
+    const invRows = await allAsync('SELECT id,payload,locked_at FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]);
+    if(!invRows.length) return res.status(404).json({ok:false,error:'not found'});
+    if(invRows[0].locked_at) return res.status(400).json({ok:false,error:'invoice locked'});
+    const targetVersion = parseInt(version,10); if(!targetVersion || targetVersion<1) return res.status(400).json({ok:false,error:'invalid version'});
+    const rows = await allAsync('SELECT version,payload_json FROM invoice_versions WHERE invoice_id=? AND version=?',[req.params.id,targetVersion]);
+    if(!rows.length) return res.status(404).json({ok:false,error:'version not found'});
+    const latest = await allAsync('SELECT MAX(version) as mv FROM invoice_versions WHERE invoice_id=?',[req.params.id]);
+    const nextV = (latest[0]?.mv || 1)+1;
+    const payloadJson = rows[0].payload_json;
+    // Insert new version snapshot
+    await runAsync('INSERT INTO invoice_versions (invoice_id,version,payload_json) VALUES (?,?,?)',[req.params.id,nextV,payloadJson]);
+    // Update primary invoice payload to latest snapshot for convenience
+    await runAsync('UPDATE invoices SET payload=? WHERE id=?',[payloadJson, req.params.id]);
+    let parsed={}; try{ parsed=JSON.parse(payloadJson);}catch{}
+    res.json({ok:true, invoice_id:Number(req.params.id), version: nextV, payload: parsed});
+  } catch(e){ res.status(500).json({ok:false,error:e.message}); }
+});
+// Lock invoice (no more changes / revert)
+app.patch('/api/invoices/:id/lock', requireUser, async (req,res)=>{
+  try {
+    const rows = await allAsync('SELECT id,locked_at FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]);
+    if(!rows.length) return res.status(404).json({ok:false,error:'not found'});
+    if(rows[0].locked_at) return res.json({ok:true, locked_at: rows[0].locked_at});
+    await runAsync('UPDATE invoices SET locked_at=CURRENT_TIMESTAMP WHERE id=?',[req.params.id]);
+    const updated = await allAsync('SELECT locked_at FROM invoices WHERE id=?',[req.params.id]);
+    res.json({ok:true, locked_at: updated[0]?.locked_at || null});
+  } catch(e){ res.status(500).json({ok:false,error:e.message}); }
 });
 app.get('/api/invoices/:id/pdf', requireUser, async (req,res)=>{
   try {
-    const rows=await allAsync('SELECT * FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]); if(!rows.length) return res.status(404).json({ok:false,error:'not found'});
-    const inv=rows[0]; let payload={}; try{ payload=JSON.parse(inv.payload);}catch{}
+    const rows=await allAsync('SELECT * FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]);
+    if(!rows.length) return res.status(404).json({ok:false,error:'not found'});
+    const inv=rows[0];
+    // fetch latest snapshot payload from versions (fallback to invoice.payload)
+    const vRows = await allAsync('SELECT payload_json FROM invoice_versions WHERE invoice_id=? ORDER BY version DESC LIMIT 1',[inv.id]);
+    let payload={};
+    if(vRows.length){ try{ payload=JSON.parse(vRows[0].payload_json);}catch{ payload={}; } }
+    else { try{ payload=JSON.parse(inv.payload||'{}'); }catch{ payload={}; } }
     const clientRows=await allAsync('SELECT name,vat,address FROM clients WHERE id=?',[inv.client_id]); const client=clientRows[0]||{};
     const profile = await getBusinessProfile(req.userId);
     const ctx = buildTemplateContext({ profile, client:{ name: client.name, address: client.address } });
-    // Merge defaults for currency / vat if missing in stored payload
     if((payload.taxRate==null || payload.taxRate==='') && ctx.defaults.vatRate!=='') payload.taxRate = ctx.defaults.vatRate;
     if(!payload.notes && ctx.defaults.noteFooter) payload.notes = ctx.defaults.noteFooter;
     if(payload.notes) payload.notes = applyTemplate(payload.notes, ctx);
@@ -660,12 +721,10 @@ app.get('/api/invoices/:id/pdf', requireUser, async (req,res)=>{
     const primary='#1e3a8a'; const light='#64748b';
     doc.fillColor(primary).fontSize(22).text('FATTURA',40,48);
     doc.fontSize(10).fillColor(light).text(`Numero: ${inv.number}`,40,78); doc.fontSize(10).fillColor(light).text(`Data: ${new Date(inv.created_at).toISOString().slice(0,10)}`,40,92);
-    // Fornitore (company)
     doc.fontSize(11).fillColor(primary).text('FORNITORE',40,120);
     const companyLine = ctx.company.name + (ctx.company.piva? ` (P.IVA ${ctx.company.piva})`: '');
     doc.fontSize(10).fillColor(light).text(companyLine,40,136);
     if(ctx.company.address) doc.text(ctx.company.address,40,150);
-    // Cliente
     doc.fontSize(11).fillColor(primary).text('CLIENTE',300,120); doc.fontSize(10).fillColor(light).text(client.name||'',300,136); if(client.vat) doc.text('P.IVA: '+client.vat,300,150); if(client.address) doc.text(client.address,300,164);
     const items = Array.isArray(payload.items)?payload.items:[]; const startY=210; doc.moveTo(40,startY).lineTo(555,startY).strokeColor(primary).stroke(); doc.fontSize(10).fillColor(primary).text('DESCRIZIONE',45,startY+8); doc.text('QTA',300,startY+8); doc.text('PREZZO',360,startY+8); doc.text('TOTALE',450,startY+8);
     let y=startY+26; let subtotal=0; items.forEach(it=>{ const lineTotal=(Number(it.qty)||0)*(Number(it.price)||0); subtotal+=lineTotal; doc.fillColor('#000').fontSize(10).text(it.desc||'',45,y,{width:240}); doc.text(String(it.qty||''),300,y); doc.text(formatMoney(it.price||0, inv.currency),360,y); doc.text(formatMoney(lineTotal, inv.currency),450,y); y+=18; if(y>700){ doc.addPage(); y=60; }});

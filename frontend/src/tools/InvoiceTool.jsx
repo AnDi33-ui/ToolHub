@@ -21,6 +21,12 @@ export function InvoiceTool(){
   const [notes,setNotes]=React.useState('');
   const [items,setItems]=React.useState([{id:Math.random().toString(36).slice(2),desc:'Servizio',qty:1,price:100}]);
   const [invoices,setInvoices] = React.useState([]);
+  const [selectedInvoiceId,setSelectedInvoiceId] = React.useState(null);
+  const [invoiceHistory,setInvoiceHistory] = React.useState([]); // versions meta
+  const [historyLoading,setHistoryLoading] = React.useState(false);
+  const [viewVersion,setViewVersion] = React.useState(null);
+  const [viewPayload,setViewPayload] = React.useState(null);
+  const [lockState,setLockState] = React.useState(null);
   const [status,setStatus] = React.useState('');
   const [loginRequired,setLoginRequired]=React.useState(false);
   const [authChecked,setAuthChecked]=React.useState(false);
@@ -38,6 +44,12 @@ export function InvoiceTool(){
 
   async function loadClients(){ try{ const j = await apiFetch('/api/clients'); if(j.ok){ setClients(j.items); if(!clientId && j.items.length) setClientId(String(j.items[0].id)); } }catch(e){ if(e.status===401){ setLoginRequired(true);} else { window.ToolHubToast?.('Errore caricamento clienti','error'); }} }
   async function loadInvoices(){ try{ const j = await apiFetch('/api/invoices'); if(j.ok) setInvoices(j.items); }catch(e){ if(e.status===401){ setLoginRequired(true);} else { window.ToolHubToast?.('Errore caricamento fatture','error'); }} }
+  async function loadHistory(invId){ setHistoryLoading(true); setInvoiceHistory([]); setViewVersion(null); setViewPayload(null); try{ const h=await apiFetch(`/api/invoices/${invId}/history`); if(h.ok){ setInvoiceHistory(h.versions||[]); } }catch(e){ window.ToolHubToast?.('Errore history','error'); } finally { setHistoryLoading(false);} }
+  async function openVersion(invId,v){ try{ const r=await apiFetch(`/api/invoices/${invId}/version/${v}`); if(r.ok){ setViewVersion(v); setViewPayload(r.payload); } }catch(e){ window.ToolHubToast?.('Errore lettura versione','error'); } }
+  async function revertVersion(invId,v){ if(!window.confirm('Creare nuova versione dalla v'+v+'?')) return; try{ const r=await apiFetch(`/api/invoices/${invId}/revert`,{ method:'POST', body:{version:v} }); if(r.ok){ window.ToolHubToast?.('Nuova versione creata','success'); await loadHistory(invId); setViewVersion(r.version); setViewPayload(r.payload); } else window.ToolHubToast?.('Errore revert','error'); }catch(e){ window.ToolHubToast?.('Errore revert','error'); }
+  }
+  async function lockInvoice(invId){ if(!window.confirm('Bloccare definitivamente la fattura?')) return; try{ const r=await apiFetch(`/api/invoices/${invId}/lock`,{ method:'PATCH'}); if(r.ok){ window.ToolHubToast?.('Fattura bloccata','success'); setLockState(r.locked_at); } else window.ToolHubToast?.('Errore lock','error'); }catch(e){ window.ToolHubToast?.('Errore lock','error'); }
+  }
   const appliedDefaultsRef = React.useRef(false);
   React.useEffect(()=>{
     if(profile && !appliedDefaultsRef.current){
@@ -108,10 +120,30 @@ export function InvoiceTool(){
         <h3 style={{margin:0,fontSize:'.9rem'}}>Fatture recenti</h3>
         <div style={{maxHeight:260,overflow:'auto',display:'grid',gap:4,fontSize:'.6rem'}}>
           {loadingData && <div className="skeleton" style={{height:12,width:'60%'}} />}
-          {!loadingData && invoices.map(inv=> <div key={inv.id}>#{inv.number} - {currencyFormat(inv.total||0,inv.currency||currency)} <button className="btn secondary" style={{fontSize:'.55rem'}} onClick={()=>window.open(API_BASE+`/api/invoices/${inv.id}/pdf`,'_blank')}>PDF</button></div>)}
+          {!loadingData && invoices.map(inv=> <div key={inv.id}>#{inv.number} - {currencyFormat(inv.total||0,inv.currency||currency)} <button className="btn secondary" style={{fontSize:'.55rem'}} onClick={()=>window.open(API_BASE+`/api/invoices/${inv.id}/pdf`,'_blank')}>PDF</button> <button className="btn secondary" style={{fontSize:'.55rem'}} onClick={()=>{ setSelectedInvoiceId(inv.id); loadHistory(inv.id); setLockState(inv.locked_at||null); }}>History</button></div>)}
           {!loadingData && invoices.length===0 && <div style={{opacity:.6}}>Nessuna fattura</div>}
         </div>
       </div>
+      {selectedInvoiceId && <div className="card" style={{display:'grid',gap:6}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <h3 style={{margin:0,fontSize:'.85rem'}}>History #{selectedInvoiceId}</h3>
+          <button className="btn secondary" style={{fontSize:'.55rem'}} onClick={()=>{ setSelectedInvoiceId(null); setInvoiceHistory([]); setViewPayload(null); }}>Chiudi</button>
+        </div>
+        {lockState && <div style={{fontSize:10,color:'#dc2626'}}>LOCKED {new Date(lockState).toLocaleDateString()}</div>}
+        {historyLoading && <div style={{fontSize:10}}>Caricamento...</div>}
+        {!historyLoading && invoiceHistory.length===0 && <div style={{fontSize:10,opacity:.6}}>Nessuna versione</div>}
+        {!historyLoading && invoiceHistory.length>0 && <div style={{display:'grid',gap:4}}>
+          {invoiceHistory.map(v=> <div key={v.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:10}}>
+            <button className="btn secondary" style={{fontSize:'.5rem'}} onClick={()=>openVersion(selectedInvoiceId,v.version)}>v{v.version}</button>
+            <span>{new Date(v.created_at).toLocaleString()}</span>
+            {!lockState && v.version!==invoiceHistory[invoiceHistory.length-1].version && <button className="btn secondary" style={{fontSize:'.5rem'}} onClick={()=>revertVersion(selectedInvoiceId,v.version)}>Revert→new</button>}
+          </div>)}
+        </div>}
+        {viewPayload && <div style={{border:'1px solid #ddd',padding:6,borderRadius:4,maxHeight:140,overflow:'auto',background:'#fafafa'}}>
+          <pre style={{margin:0,fontSize:9}}>{JSON.stringify(viewPayload,null,2)}</pre>
+        </div>}
+        {!lockState && invoiceHistory.length>0 && <button className="btn" style={{fontSize:'.55rem'}} onClick={()=>lockInvoice(selectedInvoiceId)}>Blocca fattura</button>}
+      </div>}
     </div>
   {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={()=>{ refreshProfile(); setProfileEditorOpen(false); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
   </div>;
