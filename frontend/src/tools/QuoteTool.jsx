@@ -3,6 +3,7 @@
 import { apiFetch, track } from '../shared/api.js';
 import { currencyFormat } from '../shared/format.js';
 import ProfileEditor from '../shared/ui/ProfileEditor.jsx';
+import useBusinessProfile from '../shared/hooks/useBusinessProfile.js';
 
 export function QuoteTool(){
   const API_BASE = (window.API_BASE || (location.port==='5173'?'http://localhost:3000':''));
@@ -22,10 +23,11 @@ export function QuoteTool(){
   const [error,setError] = React.useState('');
   const [highDiscConfirmed,setHighDiscConfirmed] = React.useState(false);
   const [loadingTemplates,setLoadingTemplates] = React.useState(false);
-  const [profile,setProfile] = React.useState(null);
+  const { profile, refresh: refreshProfile } = useBusinessProfile(!!user);
   const [profileEditorOpen,setProfileEditorOpen] = React.useState(false);
   React.useEffect(()=>{ apiFetch('/api/auth/me').then(j=>{ if(j.ok) setUser(j.user); }).catch(()=>{}); },[]);
-  React.useEffect(()=>{ if(user){ apiFetch('/api/profile').then(j=>{ if(j.ok && j.profile){ setProfile(j.profile); if(j.profile.aliquota_iva_default!=null) setVat(j.profile.aliquota_iva_default); if(j.profile.currency_default) setCurrency(j.profile.currency_default); if(j.profile.note_footer_default && !note) setNote(j.profile.note_footer_default); if(j.profile.ragione_sociale) setCompany(c=>({...c,name:j.profile.ragione_sociale})); if(j.profile.indirizzo) setCompany(c=>({...c,address:j.profile.indirizzo})); } }).catch(()=>{}); } },[user]);
+  const appliedDefaultsRef = React.useRef(false);
+  React.useEffect(()=>{ if(profile && !appliedDefaultsRef.current){ if(profile.aliquota_iva_default!=null) setVat(profile.aliquota_iva_default); if(profile.currency_default) setCurrency(profile.currency_default); if(profile.note_footer_default && !note) setNote(profile.note_footer_default); if(profile.ragione_sociale) setCompany(c=>({...c,name:profile.ragione_sociale})); if(profile.indirizzo) setCompany(c=>({...c,address:profile.indirizzo})); appliedDefaultsRef.current=true; } },[profile,note]);
   function addItem(){ setItems(prev=> [...prev,{desc:'',qty:1,price:0}]); }
   function update(i,field,val){ setItems(prev=> prev.map((it,idx)=> idx===i? {...it,[field]: field==='desc'? val : val}:it)); }
   function remove(i){ setItems(prev=> prev.filter((_,idx)=> idx!==i)); }
@@ -121,7 +123,7 @@ export function QuoteTool(){
       </div>
       {error && <div style={{color:'red',fontSize:12}}>{error}</div>}
     </div>
-    {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={(p)=>{ setProfile(p); setProfileEditorOpen(false); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
+  {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={()=>{ refreshProfile(); setProfileEditorOpen(false); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
   </div>;
 }
 export default QuoteTool;

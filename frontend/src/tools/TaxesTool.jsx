@@ -2,6 +2,7 @@
 import { currencyFormat, percentFormat } from '../shared/format';
 import { track } from '../shared/api';
 import ProfileEditor from '../shared/ui/ProfileEditor.jsx';
+import useBusinessProfile from '../shared/hooks/useBusinessProfile.js';
 
 /* TaxesTool React version
    Enhancements:
@@ -32,7 +33,7 @@ export default function TaxesTool(){
   const [focusRegime,setFocusRegime] = useState('forfettario');
   const [results,setResults] = useState(null);
   const [msg,setMsg] = useState('');
-  const [profile,setProfile] = useState(null);
+  const { profile, refresh: refreshProfile } = useBusinessProfile(true);
   const [profileEditorOpen,setProfileEditorOpen] = useState(false);
 
   function toast(t){ if(window.ToolHubToast){ window.ToolHubToast(t); } else setMsg(t); }
@@ -43,9 +44,8 @@ export default function TaxesTool(){
   const highlight = bestNet();
 
   useEffect(()=>{ track('taxes_tool_open'); },[]);
-  useEffect(()=>{ // load profile to prefill regime or future defaults
-    fetch('/api/profile', { credentials:'include'}).then(r=>r.json()).then(j=>{ if(j.ok && j.profile){ setProfile(j.profile); if(j.profile.regime_fiscale) setFocusRegime(j.profile.regime_fiscale); } }).catch(()=>{});
-  },[]);
+  const appliedRef = React.useRef(false);
+  useEffect(()=>{ if(profile && !appliedRef.current){ if(profile.regime_fiscale) setFocusRegime(profile.regime_fiscale); appliedRef.current=true; } },[profile]);
 
   return (
     <div className="card">
@@ -99,7 +99,7 @@ export default function TaxesTool(){
         </ul>
       </details>
       <div style={{marginTop:8,fontSize:10,color:'#64748b'}}>{msg}</div>
-      {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={(p)=>{ setProfile(p); setProfileEditorOpen(false); if(p?.regime_fiscale) setFocusRegime(p.regime_fiscale); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
+  {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={()=>{ refreshProfile(); setProfileEditorOpen(false); if(profile?.regime_fiscale) setFocusRegime(profile.regime_fiscale); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
     </div>
   );
 }

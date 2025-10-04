@@ -20,6 +20,8 @@
 
 
 <script src="/dist/ToastHost-GQ52DK7L.js"></script>
+
+
 <script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
 </head>
@@ -37,8 +39,9 @@
       <div id="tool-root"></div>
     </main>
     <footer style="margin-top:60px"><div>© ToolHub</div></footer>
+<!-- RIMOSSO: loader duplicato legacy. Manteniamo solo Loader v2 più sotto. -->
 <script>
-// Loader v2 (inline) - resilience + diagnostics
+// Loader v2 (single) - resilience + diagnostics
 window.API_BASE=window.API_BASE||'http://localhost:3000';
 (function(){
   const started=Date.now();
@@ -59,7 +62,8 @@ window.API_BASE=window.API_BASE||'http://localhost:3000';
   }
   if(!finalKey){ showError('Param ?tool mancante. Usa es: ?tool=pdfjpg'); return; }
   const valid=['invoice','quote','bmi','flashcard','pdfjpg','taxes'];
-  const map={"invoice":"tools/InvoiceTool-ZFP7PG3E.js","quote":"tools/QuoteTool-2SHTJMHV.js","bmi":"tools/BmiTool-UTZI7FGX.js","flashcard":"tools/FlashcardTool-7MEVKPI3.js","pdfjpg":"tools/PdfJpgTool-JIYOFRPO.js","taxes":"tools/TaxesTool-ISVBFNOO.js"};
+  // Mappa generata dall'ultimo build. Verrà sovrascritta a ogni build.
+  const map={"invoice":"tools/InvoiceTool-HP5ARPFC.js","quote":"tools/QuoteTool-ICOJAHHB.js","bmi":"tools/BmiTool-UTZI7FGX.js","flashcard":"tools/FlashcardTool-7MEVKPI3.js","pdfjpg":"tools/PdfJpgTool-JIYOFRPO.js","taxes":"tools/TaxesTool-Z7NODBEC.js"};
   if(!map[finalKey]){ showError('Tool non compilato o nome errato. Validi: '+valid.join(', ')); return; }
   window.addEventListener('error',e=>{ if(!root.dataset.mounted) showError('Errore JS globale', e.message||e.error); });
   window.addEventListener('unhandledrejection',e=>{ if(!root.dataset.mounted) showError('Promise rejection', e.reason); });

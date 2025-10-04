@@ -5,6 +5,7 @@
 import { apiFetch, ApiError, track } from '../shared/api.js';
 import { currencyFormat, numberFormat } from '../shared/format.js';
 import ProfileEditor from '../shared/ui/ProfileEditor.jsx';
+import useBusinessProfile from '../shared/hooks/useBusinessProfile.js';
 
 export function InvoiceTool(){
   const API_BASE = (window.API_BASE || (location.port==='5173'? 'http://localhost:3000':'')).replace(/\/$/,'');
@@ -27,7 +28,7 @@ export function InvoiceTool(){
   const [upgrading,setUpgrading]=React.useState(false);
   const noClients = clients.length===0;
   const [loadingData,setLoadingData] = React.useState(true);
-  const [profile,setProfile] = React.useState(null);
+  const { profile, refresh: refreshProfile } = useBusinessProfile(!loginRequired); // carica dopo auth
   const [profileEditorOpen,setProfileEditorOpen] = React.useState(false);
 
   function updateItem(id,field,val){ setItems(prev=> prev.map(it=> it.id===id? {...it,[field]: field==='desc'? val : Number(val)}:it)); }
@@ -37,22 +38,17 @@ export function InvoiceTool(){
 
   async function loadClients(){ try{ const j = await apiFetch('/api/clients'); if(j.ok){ setClients(j.items); if(!clientId && j.items.length) setClientId(String(j.items[0].id)); } }catch(e){ if(e.status===401){ setLoginRequired(true);} else { window.ToolHubToast?.('Errore caricamento clienti','error'); }} }
   async function loadInvoices(){ try{ const j = await apiFetch('/api/invoices'); if(j.ok) setInvoices(j.items); }catch(e){ if(e.status===401){ setLoginRequired(true);} else { window.ToolHubToast?.('Errore caricamento fatture','error'); }} }
-  async function loadProfile(){
-    try {
-      const j = await apiFetch('/api/profile');
-      if(j.ok){
-        setProfile(j.profile);
-        if(j.profile){
-          if(j.profile.aliquota_iva_default!=null) setTaxRate(Number(j.profile.aliquota_iva_default));
-          if(j.profile.currency_default) setCurrency(j.profile.currency_default);
-          if(j.profile.ragione_sociale){ /* could map to company block later */ }
-          if(j.profile.note_footer_default && !notes) setNotes(j.profile.note_footer_default);
-        }
-      }
-    } catch(e){ /* silent */ }
-  }
+  const appliedDefaultsRef = React.useRef(false);
+  React.useEffect(()=>{
+    if(profile && !appliedDefaultsRef.current){
+      if(profile.aliquota_iva_default!=null) setTaxRate(Number(profile.aliquota_iva_default));
+      if(profile.currency_default) setCurrency(profile.currency_default);
+      if(profile.note_footer_default && !notes) setNotes(profile.note_footer_default);
+      appliedDefaultsRef.current=true;
+    }
+  },[profile, notes]);
 
-  async function checkAuth(){ setAuthError(''); setLoadingData(true); try{ const j=await apiFetch('/api/auth/me'); if(j.ok){ setAuthChecked(true); setLoginRequired(false); await Promise.all([loadClients(), loadInvoices(), loadProfile()]); setLoadingData(false); return; } } catch(e){ if(e.status===401){ let legacy=null; try{ legacy=localStorage.getItem('sessionToken'); }catch(_){ } if(legacy){ setUpgrading(true); try { const j2=await apiFetch('/api/auth/me',{ headers:{'x-session-token':legacy}}); if(j2.ok){ setAuthChecked(true); setLoginRequired(false); setUpgrading(false); await Promise.all([loadClients(), loadInvoices(), loadProfile()]); setLoadingData(false); return; } } catch(err){ /* ignore */ } setUpgrading(false); setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return; } setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return;} setAuthError(e.message||'Errore auth'); setAuthChecked(true); setLoadingData(false); }}
+  async function checkAuth(){ setAuthError(''); setLoadingData(true); try{ const j=await apiFetch('/api/auth/me'); if(j.ok){ setAuthChecked(true); setLoginRequired(false); await Promise.all([loadClients(), loadInvoices(), refreshProfile()]); setLoadingData(false); return; } } catch(e){ if(e.status===401){ let legacy=null; try{ legacy=localStorage.getItem('sessionToken'); }catch(_){ } if(legacy){ setUpgrading(true); try { const j2=await apiFetch('/api/auth/me',{ headers:{'x-session-token':legacy}}); if(j2.ok){ setAuthChecked(true); setLoginRequired(false); setUpgrading(false); await Promise.all([loadClients(), loadInvoices(), refreshProfile()]); setLoadingData(false); return; } } catch(err){ /* ignore */ } setUpgrading(false); setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return; } setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return;} setAuthError(e.message||'Errore auth'); setAuthChecked(true); setLoadingData(false); }}
   React.useEffect(()=>{ checkAuth(); },[]);
 
   function validateClient(){ if(!cName.trim()) return 'Nome cliente obbligatorio'; return null; }
@@ -117,7 +113,7 @@ export function InvoiceTool(){
         </div>
       </div>
     </div>
-    {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={(p)=>{ setProfile(p); setProfileEditorOpen(false); loadProfile(); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
+  {profileEditorOpen && <ProfileEditor profile={profile} onClose={()=>setProfileEditorOpen(false)} onSaved={()=>{ refreshProfile(); setProfileEditorOpen(false); window.ToolHubToast?.('Profilo aggiornato','success'); }} />}
   </div>;
 }
 
