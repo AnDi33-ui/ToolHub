@@ -30,6 +30,10 @@
 	</style>
 </head>
 <body class="preload">
+	<noscript><style>body.preload .navbar,body.preload main,body.preload footer{opacity:1}</style><div style="background:#fee2e2;color:#991b1b;padding:8px 14px;font-size:.7rem;text-align:center">JavaScript disabilitato: alcune funzioni (login, modali) non saranno disponibili.</div></noscript>
+	<script> // Safety timeout to avoid stuck preload
+	setTimeout(function(){ if(document.body.classList.contains('preload')){ document.body.classList.remove('preload'); document.body.classList.add('app-ready'); } }, 1600);
+	</script>
 	<nav class="navbar">
 		<div class="logo"><a href="/" style="text-decoration:none;color:inherit">ToolHub</a></div>
 		<ul class="navlinks">
@@ -150,9 +154,7 @@
 		</div>
 	</div>
 
-	<script>
-		window.API_BASE = 'http://localhost:3000';
-	</script>
-	<script src="/landing.js" type="text/babel"></script>
+	<script>window.API_BASE='http://localhost:3000';</script>
+	<script src="/landing.js"></script>
 </body>
 </html>
