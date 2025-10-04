@@ -148,6 +148,20 @@ db.serialize(() => {
     updated_at DATETIME
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_business_profile_user ON business_profile(user_id)`);
+  // Versioning fatture
+  db.run(`CREATE TABLE IF NOT EXISTS invoice_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(invoice_id,version)
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_invoice_versions_invoice ON invoice_versions(invoice_id,version)`);
+  // Attempt non-breaking column additions
+  db.run('ALTER TABLE business_profile ADD COLUMN invoice_number_format TEXT', ()=>{});
+  db.run('ALTER TABLE users ADD COLUMN last_invoice_year INTEGER', ()=>{});
+  db.run('ALTER TABLE invoices ADD COLUMN locked_at DATETIME', ()=>{});
 });
 
 // Sessions: legacy map (for old x-session-token) + persistent table
@@ -191,6 +205,34 @@ const exportLimiter = rateLimit({ windowMs: 15*60*1000, max: 50, standardHeaders
 function runAsync(sql,p=[]) { return new Promise((res,rej)=> db.run(sql,p,function(err){ err?rej(err):res(this); })); }
 function allAsync(sql,p=[]) { return new Promise((res,rej)=> db.all(sql,p,(err,rows)=> err?rej(err):res(rows))); }
 function formatMoney(amount,currency='EUR'){ try{ return new Intl.NumberFormat('it-IT',{style:'currency',currency}).format(Number(amount||0)); }catch{ return (currency==='EUR'?'€':'')+Number(amount||0).toFixed(2);} }
+
+// --- Invoice Numbering & Versioning Helpers ---
+const INVOICE_NUMBER_PATTERN_DEFAULT='{{year}}-{{seq:4}}';
+function validateInvoicePattern(p){
+  if(!p || typeof p!=='string') return false;
+  // Allowed chars outside placeholders: letters, digits, - _ /
+  // Placeholders: {{year}} {{seq}} {{seq:N}}
+  const placeholderRe=/{{\s*(year|seq(?::\d+)?)\s*}}/g;
+  // Quick structural validation: remove placeholders then check remaining chars
+  const stripped = p.replace(placeholderRe,'');
+  if(!/^[A-Za-z0-9\-_/]*$/.test(stripped)) return false;
+  // Ensure all placeholders valid
+  let m; placeholderRe.lastIndex=0; while((m=placeholderRe.exec(p))){ /* already validated by regex */ }
+  return true;
+}
+function generateInvoiceNumber(pattern, year, seq){
+  const pat = validateInvoicePattern(pattern)? pattern : INVOICE_NUMBER_PATTERN_DEFAULT;
+  return pat.replace(/{{\s*(year|seq(?::\d+)?)\s*}}/g,(m, key)=>{
+    if(key.startsWith('year')) return String(year);
+    if(key.startsWith('seq')){
+      const parts=key.split(':');
+      if(parts.length===2){ const width = Math.min(parseInt(parts[1],10)||0,8); return width>0? String(seq).padStart(width,'0'): String(seq); }
+      return String(seq);
+    }
+    return '';
+  });
+}
+
 
 // --- Template Engine (simple placeholder replacement) ---
 // Supported placeholders: {{company.name}} {{company.address}} {{company.piva}} {{company.codice_fiscale}} {{company.regime_fiscale}}
@@ -571,16 +613,30 @@ app.post('/api/invoices', requireUser, async (req,res)=>{
   try {
     const clientRows = await allAsync('SELECT id,name,vat,address FROM clients WHERE id=? AND user_id=?',[clientId,req.userId]);
     if(!clientRows.length) return res.status(404).json({ok:false,error:'client not found'});
-    // increment invoice seq
+    // numbering with annual reset & pattern
+    const year = new Date().getFullYear();
+    const uMeta = await allAsync('SELECT last_invoice_seq,last_invoice_year FROM users WHERE id=?',[req.userId]);
+    let lastSeq = uMeta[0]?.last_invoice_seq || 0;
+    let lastYear = uMeta[0]?.last_invoice_year || null;
+    if(lastYear===null || lastYear !== year){
+      lastSeq = 0;
+      await runAsync('UPDATE users SET last_invoice_seq=0,last_invoice_year=? WHERE id=?',[year,req.userId]);
+    }
+    // increment
     await runAsync('UPDATE users SET last_invoice_seq = COALESCE(last_invoice_seq,0) + 1 WHERE id=?',[req.userId]);
-    const urow = await allAsync('SELECT last_invoice_seq FROM users WHERE id=?',[req.userId]);
+    const urow = await allAsync('SELECT last_invoice_seq,last_invoice_year FROM users WHERE id=?',[req.userId]);
     const seq = urow[0].last_invoice_seq || 1;
-    const number = String(seq).padStart(4,'0');
+    // fetch invoice number format
+    const prof = await allAsync('SELECT invoice_number_format FROM business_profile WHERE user_id=?',[req.userId]);
+    const pattern = prof[0]?.invoice_number_format || null;
+    const number = generateInvoiceNumber(pattern, year, seq);
     let subtotal=0; (items||[]).forEach(it=>{ subtotal += (Number(it.qty)||0)*(Number(it.price)||0); });
     const tax = subtotal * (Number(taxRate)||0)/100; const total=subtotal+tax;
     const payload = { clientId, items, taxRate, currency, notes };
     const r = await runAsync('INSERT INTO invoices (user_id,client_id,number,total,currency,status,payload) VALUES (?,?,?,?,?,?,?)',[req.userId,clientId,number,total,currency,'issued',JSON.stringify(payload)]);
-    res.json({ok:true,id:r.lastID,number,total});
+    // snapshot versione iniziale
+    try { await runAsync('INSERT INTO invoice_versions (invoice_id,version,payload_json) VALUES (?,?,?)',[r.lastID,1,JSON.stringify(payload)]); } catch(e){ console.error('[invoice-version] init snapshot failed', e.message); }
+    res.json({ok:true,id:r.lastID,number,total,version:1});
   } catch(e){ res.status(500).json({ok:false,error:e.message}); }
 });
 app.get('/api/invoices', requireUser, async (req,res)=>{
