@@ -1,5 +1,8 @@
 // Using global React (loaded via CDN) to avoid bundling and dynamic requires
 const { useState, useEffect } = React;
+// Lazy dynamic import of ToastHost (injected build) - fallback if bundler inlines
+let ToastHostComp = null;
+try { ToastHostComp = window.ToolHubToastHost; } catch(_){ }
 
 const API_BASE = (function(){ if(typeof window!=='undefined' && window.API_BASE) return window.API_BASE.replace(/\/$/,''); if(typeof location!=='undefined' && location.port==='5173') return 'http://localhost:3000'; return ''; })();
 if (typeof document!=='undefined' && !document.cookie.match(/(^|; )variant=/)) { const v=Math.random()<0.5?'A':'B'; document.cookie='variant='+v+'; path=/'; }
@@ -28,9 +31,10 @@ function ToolCard({tool,onUse,user}){
 
 export function App(){
   const [tools] = useState([
-    { key:'pdfjpg',title:'Convertitore PDF ↔ JPG',description:'Converti file PDF in immagini JPG e viceversa.',pro:false },
-    { key:'bmi',title:'Calcolatore IMC',description:'Calcola indice di massa corporea.',pro:false },
+  { key:'pdfjpg',title:'Convertitore PDF ↔ JPG',description:'Converti file PDF in immagini JPG e viceversa.',pro:false },
+  { key:'bmi',title:'Calcolatore IMC',description:'Calcola indice di massa corporea (versione nuova React).',pro:false },
     { key:'quote',title:'Generatore preventivi PDF',description:'Crea preventivi professionali e scaricali.',pro:true },
+  { key:'invoice',title:'Fatture PDF (Beta)',description:'Genera fatture dai clienti e righe personalizzate.',pro:true },
     { key:'flashcard',title:'Flashcard generator',description:'Genera mazzi e PDF per studio.',pro:false },
     { key:'taxes',title:'Calcolatore tasse freelance',description:'Stima tasse e ritenute.',pro:true }
   ]);
@@ -65,6 +69,7 @@ export function App(){
       {tools.map(t=> <ToolCard key={t.key} tool={t} onUse={handleUse} user={user} />)}
     </section>
     {ats.length>0 && <div style={{marginTop:24,fontSize:12,color:'#6b7280'}}>Suggerimenti: {ats.map(a=>a.tool+':'+a.reason).join(', ')}</div>}
+    {ToastHostComp ? React.createElement(ToastHostComp) : null}
   </div>;
 }
 

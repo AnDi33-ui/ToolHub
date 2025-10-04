@@ -32,6 +32,7 @@
 		/* Modal auth */
 		.hidden{display:none!important;}
 	</style>
+<script src="/dist/ToastHost-GQ52DK7L.js"></script>
 </head>
 <body class="preload">
 	<noscript><style>body.preload .navbar,body.preload main,body.preload footer{opacity:1}</style><div style="background:#fee2e2;color:#991b1b;padding:8px 14px;font-size:.7rem;text-align:center">JavaScript disabilitato: alcune funzioni (login, modali) non saranno disponibili.</div></noscript>
@@ -151,6 +152,7 @@
 				<input type="text" id="auth-name" placeholder="Nome (opzionale)" style="display:none;" autocomplete="name" />
 				<input type="password" id="auth-password" placeholder="Password" required minlength="8" autocomplete="new-password" />
 				<input type="password" id="auth-password2" placeholder="Ripeti Password" style="display:none;" minlength="8" autocomplete="new-password" />
+				<input type="text" id="auth-reset-token" placeholder="Token reset" style="display:none;" autocomplete="one-time-code" />
 				<label style="font-size:.65rem;display:flex;align-items:center;gap:6px;">
 					<input type="checkbox" id="auth-marketing" style="margin:0;" /> <span>Ricevi aggiornamenti e novità (facoltativo)</span>
 				</label>
@@ -168,7 +170,32 @@
 		</div>
 	</div>
 
+	<!-- Profile Panel -->
+	<div id="profile-panel" class="hidden" style="position:fixed;top:70px;right:10px;z-index:60;width:300px;max-width:90vw;background:var(--bg-alt);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:var(--shadow-lg);display:grid;gap:12px;font-size:.75rem;">
+		<div style="display:flex;justify-content:space-between;align-items:center;">
+			<strong style="font-size:.8rem;">Profilo</strong>
+			<button id="profile-close" class="btn secondary" style="font-size:.55rem;padding:4px 8px;">Chiudi</button>
+		</div>
+		<div><label style="display:grid;gap:4px;">Email <input id="profile-email" type="email" readonly style="background:var(--bg);opacity:.8;" /></label></div>
+		<div><label style="display:grid;gap:4px;">Nome <input id="profile-name" type="text" placeholder="Il tuo nome" /></label></div>
+		<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="profile-marketing" /> <span>Aggiornamenti prodotto</span></label>
+		<div id="profile-plan" style="font-size:.6rem;color:var(--text-light);"></div>
+		<div style="border-top:1px solid var(--border);padding-top:8px;display:grid;gap:8px;">
+			<strong style="font-size:.65rem;letter-spacing:.5px;">Cambia Password</strong>
+			<input type="password" id="cp-old" placeholder="Password attuale" autocomplete="current-password" />
+			<input type="password" id="cp-new" placeholder="Nuova password" autocomplete="new-password" />
+			<input type="password" id="cp-new2" placeholder="Ripeti nuova" autocomplete="new-password" />
+			<button class="btn outline" id="cp-submit" style="font-size:.65rem;">Aggiorna Password</button>
+			<div id="cp-status" style="font-size:.6rem;color:var(--text-light);"></div>
+		</div>
+		<div style="display:flex;gap:8px;flex-wrap:wrap;">
+			<button class="btn" id="profile-save" style="font-size:.65rem;">Salva</button>
+			<button class="btn secondary" id="profile-logout" style="font-size:.65rem;">Logout</button>
+		</div>
+		<div id="profile-status" style="font-size:.6rem;color:var(--text-light);"></div>
+	</div>
+
 	<script>window.API_BASE='http://localhost:3000';</script>
-	<script defer src="/dist/landing-YJSW3CNQ.js"></script>
+	<script defer src="/dist/landing-6X55FE7P.js"></script>
 </body>
 </html>
