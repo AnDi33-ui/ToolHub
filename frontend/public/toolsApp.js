@@ -19,18 +19,31 @@
       { key:'taxes',title:'Calcolatore tasse freelance',description:'Stima tasse e ritenute.',pro:true }
     ]);
     const [token,setToken]=useState(null); const [user,setUser]=useState(null); const [pins,setPins]=useState([]); const [variant,setVariant]=useState('A'); const [showUpgrade,setShowUpgrade]=useState(false); const [ats,setAts]=useState([]);
+    const [quota,setQuota]=useState(null); // {limits:{},usage:{}}
 
+    // Variant + ATS polling
     useEffect(()=>{ const m=document.cookie.match(/variant=([^;]+)/); if(m) setVariant(m[1]); const int=setInterval(()=>{ fetch(API_BASE+'/api/ats').then(r=>r.json()).then(d=>{ setAts(d.suggestions||[]); if(d.upsell) setShowUpgrade(true); }); },5000); return ()=>clearInterval(int); },[]);
-    useEffect(()=>{ try{ const t=localStorage.getItem('sessionToken'); if(t){ setToken(t); loadPins(t); } }catch(_){} },[]);
+    // Restore token & load user
+    useEffect(()=>{ try{ const t=localStorage.getItem('sessionToken'); if(t){ setToken(t); loadPins(t); fetchMe(t); fetchQuota(t); } }catch(_){} },[]);
     useEffect(()=>{ if(showUpgrade){ fetch(API_BASE+'/api/ab/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'banner_view',variant})}); } },[showUpgrade,variant]);
 
-    async function authQuick(promptMsg, path){ const email=window.prompt(promptMsg); if(!email) return; const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})}); const j=await r.json(); if(j.ok){ setToken(j.token); setUser(j.user); localStorage.setItem('sessionToken',j.token); loadPins(j.token);} }
+    async function fetchMe(t){ try{ const r=await fetch(API_BASE+'/api/auth/me',{headers:{'x-session-token':t}}); const j=await r.json(); if(j.ok) setUser(j.user); }catch(_){ } }
+    async function fetchQuota(t){ try{ const r=await fetch(API_BASE+'/api/usage/summary',{headers:{'x-session-token':t}}); const j=await r.json(); if(j.ok) setQuota(j); }catch(_){ } }
+
+    async function authQuick(promptMsg, path){ const email=window.prompt(promptMsg); if(!email) return; const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})}); const j=await r.json(); if(j.ok){ setToken(j.token); localStorage.setItem('sessionToken',j.token); setUser(j.user); loadPins(j.token); fetchQuota(j.token); } }
     const register=()=>authQuick('Email per registrazione:','/api/auth/register');
     const login=()=>authQuick('Email per login:','/api/auth/login');
-    async function upgrade(){ if(!token){ alert('Prima login'); return; } fetch(API_BASE+'/api/ab/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'upgrade_click',variant})}); const r=await fetch(API_BASE+'/api/pro/upgrade',{method:'POST',headers:{'x-session-token':token}}); const j=await r.json(); if(j.ok){ alert('Sei Pro!'); setUser({...user,is_pro:1}); setShowUpgrade(false);} }
-    function handleUse(key){ fetch(API_BASE+'/api/usage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({toolKey:key})}); window.open(`/tool.html?tool=${key}`,'_blank','noopener'); }
-    async function loadPins(tok){ const t=tok||token; if(!t) return; try{ const r=await fetch(API_BASE+'/api/pins',{headers:{'x-session-token':t}}); const j=await r.json(); if(j.ok) setPins(j.items||[]);}catch(_){}}
+    function logout(){ setToken(null); setUser(null); setPins([]); setQuota(null); try{ localStorage.removeItem('sessionToken'); }catch(_){} }
+    async function upgrade(){ if(!token){ alert('Prima login'); return; } fetch(API_BASE+'/api/ab/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'upgrade_click',variant})}); const r=await fetch(API_BASE+'/api/pro/upgrade',{method:'POST',headers:{'x-session-token':token}}); const j=await r.json(); if(j.ok){ alert('Sei Pro!'); setUser({...user,is_pro:1}); setShowUpgrade(false); fetchQuota(token); } }
+    function handleUse(key){ fetch(API_BASE+'/api/usage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({toolKey:key})}); if(key==='quote'){ fetchQuota(token); } window.open(`/tool.html?tool=${key}`,'_blank','noopener'); }
+    async function loadPins(tok){ const t=tok||token; if(!t) return; try{ const r=await fetch(API_BASE+'/api/pins',{headers:{'x-session-token':t}}); const j=await r.json(); if(j.ok) setPins(j.items||[]);}catch(_){} }
     async function togglePin(k){ if(!token){ alert('Login necessario'); return;} const is=pins.includes(k); try{ if(is){ await fetch(API_BASE+'/api/pins/'+k,{method:'DELETE',headers:{'x-session-token':token}}); setPins(pins.filter(p=>p!==k)); } else { await fetch(API_BASE+'/api/pins',{method:'POST',headers:{'Content-Type':'application/json','x-session-token':token},body:JSON.stringify({toolKey:k})}); setPins([...pins,k]); } }catch(e){ console.warn('pin fail',e);} }
+
+    const quotaInfo = quota && !user?.is_pro ? (
+      <div style={{fontSize:11,background:'var(--bg-alt)',padding:'6px 10px',border:'1px solid var(--border)',borderRadius:8,marginBottom:14}}>
+        Download preventivi oggi: {quota.usage.quoteDownloadsToday}/{quota.limits.quoteDownloadsPerDay} {quota.usage.quoteDownloadsToday>=quota.limits.quoteDownloadsPerDay? ' (Limite raggiunto)': ''}
+      </div>
+    ) : null;
 
     return <div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:30}}>
@@ -38,12 +51,14 @@
           <h2 style={{margin:'0 0 6px'}}>Catalogo Strumenti</h2>
           <p style={{margin:0,color:'var(--text-light)',fontSize:'.8rem'}}>Scegli e apri in nuova scheda. <a href="/" style={{fontSize:'.75rem'}}>← Torna alla Home</a></p>
         </div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           {!user && <button className="btn" onClick={register}>Registrati</button>}
           {!user && <button className="btn secondary" onClick={login}>Login</button>}
           {user && <span style={{fontSize:12}}> {user.email} {user.is_pro? '(Pro)':''}</span>}
+          {user && <button className="btn outline" onClick={logout}>Logout</button>}
         </div>
       </div>
+      {quotaInfo}
       {showUpgrade && <UpgradeBanner variant={variant} onUpgrade={upgrade} />}
       <section className="grid">
         {pins.length>0 && <div style={{gridColumn:'1/-1',marginBottom:8}}><h3 style={{margin:0,fontSize:18}}>Pinned</h3></div>}

@@ -98,7 +98,9 @@ function allAsync(sql,p=[]) { return new Promise((res,rej)=> db.all(sql,p,(err,r
 // Auth
 app.post('/api/auth/register', authLimiter, async (req,res)=>{ const {email}=req.body; if(!email) return res.status(400).json({ok:false,error:'Email required'}); try{ await runAsync('INSERT OR IGNORE INTO users (email) VALUES (?)',[email]); const rows=await allAsync('SELECT id,is_pro FROM users WHERE email=?',[email]); const user=rows[0]; const token=Math.random().toString(36).slice(2); sessionUsers.set(token,user.id); res.json({ok:true,token,user}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }});
 app.post('/api/auth/login', authLimiter, async (req,res)=>{ const {email}=req.body; if(!email) return res.status(400).json({ok:false,error:'Email required'}); try{ const rows=await allAsync('SELECT id,is_pro FROM users WHERE email=?',[email]); if(!rows.length) return res.status(404).json({ok:false,error:'User not found'}); const token=Math.random().toString(36).slice(2); sessionUsers.set(token,rows[0].id); res.json({ok:true,token,user:rows[0]}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }});
-app.post('/api/pro/upgrade', requireUser, async (req,res)=>{ try{ await runAsync('UPDATE users SET is_pro=1 WHERE id=?',[req.userId]); res.json({ok:true}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }});
+app.post('/api/pro/upgrade', requireUser, async (req,res)=>{ try{ await runAsync('UPDATE users SET is_pro=1 WHERE id=?',[req.userId]); res.json({ok:true}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }};
+// NEW: me endpoint
+app.get('/api/auth/me', requireUser, async (req,res)=>{ try{ const rows=await allAsync('SELECT email,is_pro FROM users WHERE id=?',[req.userId]); if(!rows.length) return res.status(404).json({ok:false,error:'not found'}); res.json({ok:true,user:{email:rows[0].email,is_pro:!!rows[0].is_pro}}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }});
 
 // Limits
 const BASE_LIMITS={ quoteDownloadsPerDay:3 };
@@ -106,9 +108,14 @@ async function checkBaseLimit(userId, toolKey){ if(!userId) return true; const r
 
 // Usage
 app.post('/api/usage', async (req,res)=>{ const { userId=null, toolKey, action='use' } = req.body; try{ await runAsync('INSERT INTO tool_usage (user_id,tool_key,action) VALUES (?,?,?)',[userId,toolKey,action]); res.json({ok:true}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }});
+// NEW: daily usage summary for user
+app.get('/api/usage/summary', requireUser, async (req,res)=>{ try {
+  const day=await allAsync("SELECT COUNT(*) as c FROM downloads WHERE user_id=? AND DATE(created_at)=DATE('now') AND tool_key='quote'",[req.userId]);
+  const downloadsToday=day[0]?.c||0; res.json({ok:true,limits:BASE_LIMITS,usage:{quoteDownloadsToday:downloadsToday}});
+} catch(e){ res.status(500).json({ok:false,error:e.message}); } });
 
 // ATS
-app.get('/api/ats', async (req,res)=>{ const userId=req.query.userId||null; try{ let rows; if(userId){ rows=await allAsync('SELECT tool_key,COUNT(*) as cnt FROM tool_usage WHERE user_id=? GROUP BY tool_key',[userId]); } else { rows=await allAsync('SELECT tool_key,COUNT(*) as cnt FROM tool_usage GROUP BY tool_key'); } const suggestions=rows.filter(r=>r.cnt>5).map(r=>({tool:r.tool_key,reason:`Hai usato ${r.cnt} volte`})); res.json({suggestions,upsell:suggestions.length>0}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }});
+app.get('/api/ats', async (req,res)=>{ const userId=req.query.userId||null; try{ let rows; if(userId){ rows=await allAsync('SELECT tool_key,COUNT(*) as cnt FROM tool_usage WHERE user_id=? GROUP BY tool_key',[userId]); } else { rows=await allAsync('SELECT tool_key,COUNT(*) as cnt FROM tool_usage GROUP BY tool_key'); } const suggestions=rows.filter(r=>r.cnt>5).map(r=>({tool:r.tool_key,reason:`Hai usato ${r.cnt} volte`})); res.json({suggestions,upsell:suggestions.length>0}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }};
 
 // Quote export
 app.post('/api/export/quote', exportLimiter, async (req,res)=>{
@@ -169,7 +176,7 @@ app.post('/api/ab/event', async (req,res)=>{ const {event,variant}=req.body; if(
 
 // Waitlist & contact
 app.post('/api/waitlist', async (req,res)=>{ const {email}=req.body; if(!email) return res.status(400).json({ok:false,error:'email required'}); try{ await runAsync('INSERT OR IGNORE INTO waitlist (email) VALUES (?)',[email]); res.json({ok:true}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }});
-app.post('/api/contact', async (req,res)=>{ const {email,message}=req.body; if(!email||!message) return res.status(400).json({ok:false,error:'email & message required'}); try{ await runAsync('INSERT INTO support_messages (email,message) VALUES (?,?)',[email,message]); res.json({ok:true}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }});
+app.post('/api/contact', async (req,res)=>{ const {email,message}=req.body; if(!email||!message) return res.status(400).json({ok:false,error:'email & message required'}); try{ await runAsync('INSERT INTO support_messages (email,message) VALUES (?,?)',[email,message]); res.json({ok:true}); }catch(e){ res.status(500).json({ok:false,error:e.message}); }};
 
 // Dashboard route (only if static files served)
 if (SERVE_STATIC) {
