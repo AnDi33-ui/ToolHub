@@ -8,7 +8,9 @@
     "dev": "nodemon backend/server.js",
     "frontend": "live-server frontend/public --port=5173 --no-browser",
     "dev:all": "concurrently \"npm run dev\" \"npm run frontend\"",
-    "smoke": "node scripts/smoke.js"
+    "smoke": "node scripts/smoke.js",
+    "build:frontend": "node build-frontend.cjs",
+    "dev:frontend": "node build-frontend.cjs --watch"
   },
   "keywords": [
     "tools",
@@ -21,7 +23,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.2",
+    "compression": "^1.7.4",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^4.18.2",
@@ -34,6 +38,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
+    "esbuild": "^0.21.5",
     "live-server": "^1.2.2",
     "nodemon": "^2.0.22"
   }

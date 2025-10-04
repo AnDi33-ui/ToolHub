@@ -4,10 +4,14 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
 	<title>ToolHub – Strumenti smart per studenti, freelance e PMI</title>
+	<meta name="description" content="ToolHub: converti PDF, genera preventivi, crea flashcard e calcola BMI o tasse. Freemium veloce e senza complicazioni." />
 	<link rel="stylesheet" href="/style.css" />
+	<!-- Preconnect hints -->
+	<link rel="preconnect" href="https://unpkg.com" />
 	<style>
 		body.preload .navbar,body.preload main,body.preload footer,body.preload .theme-toggle{opacity:0;}
 		body.app-ready .navbar,body.app-ready main,body.app-ready footer,body.app-ready .theme-toggle{opacity:1;transition:opacity .35s ease;}
+		body.auth-logged #open-login, body.auth-logged #open-register, body.auth-logged #pricing-login, body.auth-logged #pricing-register { display:none !important; }
 		.hero-landing{padding:70px 0 40px;display:grid;gap:46px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:center;}
 		.hero-visual{position:relative;min-height:260px;}
 		.glow{position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,rgba(var(--accent-rgb)/.35),transparent 60%);filter:blur(40px);opacity:.7;}
@@ -143,18 +147,28 @@
 		<div class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
 			<h3 id="auth-title" style="margin-top:0;">Account</h3>
 			<form id="auth-form" style="display:grid;gap:14px;">
-				<input type="email" id="auth-email" placeholder="Email" required />
-				<div style="display:flex;gap:10px;">
+				<input type="email" id="auth-email" placeholder="Email" required autocomplete="email" />
+				<input type="text" id="auth-name" placeholder="Nome (opzionale)" style="display:none;" autocomplete="name" />
+				<input type="password" id="auth-password" placeholder="Password" required minlength="8" autocomplete="new-password" />
+				<input type="password" id="auth-password2" placeholder="Ripeti Password" style="display:none;" minlength="8" autocomplete="new-password" />
+				<label style="font-size:.65rem;display:flex;align-items:center;gap:6px;">
+					<input type="checkbox" id="auth-marketing" style="margin:0;" /> <span>Ricevi aggiornamenti e novità (facoltativo)</span>
+				</label>
+				<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
 					<button class="btn" id="auth-submit" type="submit">Continua</button>
 					<button type="button" class="btn secondary" id="auth-cancel">Chiudi</button>
+					<button type="button" class="btn outline" id="auth-toggle" style="font-size:.65rem;padding:6px 10px;">Hai già un account?</button>
+				</div>
+				<div style="display:flex;justify-content:space-between;align-items:center;font-size:.6rem;">
+					<a href="#" id="auth-forgot" style="color:var(--text-light);text-decoration:none;">Password dimenticata?</a>
+					<span id="auth-mode-note" style="color:var(--text-mute)">Registrazione nuova.</span>
 				</div>
 				<div id="auth-status" style="font-size:.7rem;color:var(--text-light)"></div>
 			</form>
-			<div style="margin-top:10px;font-size:.65rem;color:var(--text-mute)" id="auth-mode-note">Registrazione nuova.</div>
 		</div>
 	</div>
 
 	<script>window.API_BASE='http://localhost:3000';</script>
-	<script src="/landing.js"></script>
+	<script defer src="/dist/landing-YJSW3CNQ.js"></script>
 </body>
 </html>

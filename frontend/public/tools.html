@@ -4,10 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ToolHub - Strumenti</title>
+  <meta name="description" content="Catalogo strumenti ToolHub: conversioni PDF/JPG, preventivi, flashcard, calcolo BMI e tasse." />
   <link rel="stylesheet" href="/style.css" />
-  <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
   <style>body.preload .navbar,body.preload main#tools-root,body.preload footer,body.preload .theme-toggle{opacity:0;}body.app-ready .navbar,body.app-ready main#tools-root,body.app-ready footer,body.app-ready .theme-toggle{opacity:1;transition:opacity .25s ease;}</style>
 </head>
 <body class="preload">
@@ -32,13 +33,7 @@
     <div>© <span id="year"></span> ToolHub – Demo.</div>
   </footer>
   <button class="btn secondary theme-toggle" id="themeToggle" aria-label="Toggle dark mode">🌗</button>
-  <!-- Tools React components -->
-  <script type="text/babel" src="/tools/PdfJpgTool.js"></script>
-  <script type="text/babel" src="/tools/BmiTool.js"></script>
-  <script type="text/babel" src="/tools/QuoteTool.js"></script>
-  <script type="text/babel" src="/tools/FlashcardTool.js"></script>
-  <script type="text/babel" src="/tools/TaxesTool.js"></script>
-  <!-- Tools App Script -->
-  <script type="text/babel" src="/toolsApp.js"></script>
+  <script>window.API_BASE='http://localhost:3000';</script>
+  <script defer src="/dist/toolsApp-XNSA35GH.js"></script>
 </body>
 </html>

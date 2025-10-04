@@ -75,6 +75,9 @@ body.dark .navbar { background:rgba(15,23,42,.7); }
 .card:hover { transform:translateY(-4px); border-color:rgba(var(--accent-rgb)/.45); box-shadow:var(--shadow-lg); }
 .card h3 { margin:0 0 10px; font-size:1.02rem; }
 .card p { margin:0 0 14px; font-size:.84rem; line-height:1.4; color:var(--text-light); }
+.tool-card { min-height:260px; }
+.tool-card-head h3 { width:100%; display:flex; align-items:center; }
+.tool-card-actions .btn { width:100%; }
 
 /* Buttons */
 .btn { --btn-bg:var(--accent-gradient); --btn-color:#fff; font:inherit; border:none; border-radius:var(--radius-sm); padding:10px 16px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; background:var(--btn-bg); color:var(--btn-color); font-weight:500; font-size:.8rem; letter-spacing:.4px; box-shadow:0 2px 5px -1px rgba(var(--accent-rgb)/.5); position:relative; transition: filter .25s, box-shadow .25s, transform .25s; }

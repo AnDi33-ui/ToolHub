@@ -7,8 +7,23 @@
   function UpgradeBanner({variant,onUpgrade}){
     return <div style={{background:variant==='A'?'#fffbeb':'#eef2ff',padding:12,borderRadius:8,marginBottom:16}}>{variant==='A'?<span><strong>Passa a Pro</strong> per download illimitati.</span>:<span><strong>Limite vicino!</strong> Aggiorna ora.</span>} <button className="btn" style={{marginLeft:8}} onClick={onUpgrade}>Upgrade</button></div>;
   }
-  function ToolCard({tool,onUse,user,pinned,onTogglePin}){
-    return <div className="card"><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><h3 style={{display:'flex',alignItems:'center',gap:6}}>{tool.title}{user && <button type="button" aria-label={pinned?'Unpin':'Pin'} onClick={()=>onTogglePin(tool.key)} style={{border:'none',background:'transparent',cursor:'pointer',fontSize:18,lineHeight:1,padding:0}}>{pinned?'★':'☆'}</button>}</h3><div><span className={'badge '+(tool.pro?'pro':'base')}>{tool.pro?'Pro':'Base'}</span></div></div><p>{tool.description}</p><div className="row"><div><button className="btn" onClick={()=>onUse(tool.key)}>Usa ora</button></div><div><button className="btn secondary" onClick={()=>alert('Condividi: implementare social share')}>Condividi</button></div></div></div>; }
+  function ToolCard({tool,onUse,user}){
+    return <div className="card tool-card">
+      <div className="tool-card-head" style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',minHeight:34}}>
+        <h3 style={{display:'flex',alignItems:'center',gap:6,margin:0,fontSize:'1.02rem'}}>
+          <span style={{display:'inline-block',flex:1}}>{tool.title}</span>
+        </h3>
+        <div><span className={'badge '+(tool.pro?'pro':'base')}>{tool.pro?'Pro':'Base'}</span></div>
+      </div>
+      <div className="tool-card-body" style={{display:'flex',flexDirection:'column',flex:1}}>
+        <p style={{flexGrow:0}}>{tool.description}</p>
+        <div style={{flexGrow:1}} />
+        <div className="tool-card-actions" style={{display:'flex',flexDirection:'column',gap:8,marginTop:4}}>
+          <button className="btn" onClick={()=>onUse(tool.key)}>Usa ora</button>
+          <button className="btn secondary" onClick={()=>alert('Condividi: implementare social share')}>Condividi</button>
+        </div>
+      </div>
+    </div>; }
 
   function App(){
     const [tools] = useState([
@@ -18,28 +33,26 @@
       { key:'flashcard',title:'Flashcard generator',description:'Genera mazzi e PDF per studio.',pro:false },
       { key:'taxes',title:'Calcolatore tasse freelance',description:'Stima tasse e ritenute.',pro:true }
     ]);
-    const [token,setToken]=useState(null); const [user,setUser]=useState(null); const [pins,setPins]=useState([]); const [variant,setVariant]=useState('A'); const [showUpgrade,setShowUpgrade]=useState(false); const [ats,setAts]=useState([]);
+    const [token,setToken]=useState(null); const [user,setUser]=useState(null); const [variant,setVariant]=useState('A'); const [showUpgrade,setShowUpgrade]=useState(false); const [ats,setAts]=useState([]);
     const [quota,setQuota]=useState(null); // {limits:{},usage:{}}
 
     // Variant + ATS polling
     useEffect(()=>{ const m=document.cookie.match(/variant=([^;]+)/); if(m) setVariant(m[1]); const int=setInterval(()=>{ fetch(API_BASE+'/api/ats').then(r=>r.json()).then(d=>{ setAts(d.suggestions||[]); if(d.upsell) setShowUpgrade(true); }); },5000); return ()=>clearInterval(int); },[]);
     // Restore token & load user
-    useEffect(()=>{ try{ const t=localStorage.getItem('sessionToken'); if(t){ setToken(t); loadPins(t); fetchMe(t); fetchQuota(t); } }catch(_){} },[]);
+    useEffect(()=>{ try{ const t=localStorage.getItem('sessionToken'); if(t){ setToken(t); fetchMe(t); fetchQuota(t); } }catch(_){} },[]);
     useEffect(()=>{ if(showUpgrade){ fetch(API_BASE+'/api/ab/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'banner_view',variant})}); } },[showUpgrade,variant]);
 
     async function fetchMe(t){ try{ const r=await fetch(API_BASE+'/api/auth/me',{headers:{'x-session-token':t}}); const j=await r.json(); if(j.ok) setUser(j.user); }catch(_){ } }
     async function fetchQuota(t){ try{ const r=await fetch(API_BASE+'/api/usage/summary',{headers:{'x-session-token':t}}); const j=await r.json(); if(j.ok) setQuota(j); }catch(_){ } }
 
-    async function authQuick(promptMsg, path){ const email=window.prompt(promptMsg); if(!email) return; const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})}); const j=await r.json(); if(j.ok){ setToken(j.token); localStorage.setItem('sessionToken',j.token); setUser(j.user); loadPins(j.token); fetchQuota(j.token); } }
+    async function authQuick(promptMsg, path){ const email=window.prompt(promptMsg); if(!email) return; const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})}); const j=await r.json(); if(j.ok){ setToken(j.token); localStorage.setItem('sessionToken',j.token); setUser(j.user); fetchQuota(j.token); } }
     const register=()=>authQuick('Email per registrazione:','/api/auth/register');
     const login=()=>authQuick('Email per login:','/api/auth/login');
-    function logout(){ setToken(null); setUser(null); setPins([]); setQuota(null); try{ localStorage.removeItem('sessionToken'); }catch(_){} }
+    function logout(){ setToken(null); setUser(null); setQuota(null); try{ localStorage.removeItem('sessionToken'); }catch(_){} }
     async function upgrade(){ if(!token){ alert('Prima login'); return; } fetch(API_BASE+'/api/ab/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'upgrade_click',variant})}); const r=await fetch(API_BASE+'/api/pro/upgrade',{method:'POST',headers:{'x-session-token':token}}); const j=await r.json(); if(j.ok){ alert('Sei Pro!'); setUser({...user,is_pro:1}); setShowUpgrade(false); fetchQuota(token); } }
     function handleUse(key){ fetch(API_BASE+'/api/usage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({toolKey:key})}); if(key==='quote'){ fetchQuota(token); } window.open(`/tool.html?tool=${key}`,'_blank','noopener'); }
-    async function loadPins(tok){ const t=tok||token; if(!t) return; try{ const r=await fetch(API_BASE+'/api/pins',{headers:{'x-session-token':t}}); const j=await r.json(); if(j.ok) setPins(j.items||[]);}catch(_){} }
-    async function togglePin(k){ if(!token){ alert('Login necessario'); return;} const is=pins.includes(k); try{ if(is){ await fetch(API_BASE+'/api/pins/'+k,{method:'DELETE',headers:{'x-session-token':token}}); setPins(pins.filter(p=>p!==k)); } else { await fetch(API_BASE+'/api/pins',{method:'POST',headers:{'Content-Type':'application/json','x-session-token':token},body:JSON.stringify({toolKey:k})}); setPins([...pins,k]); } }catch(e){ console.warn('pin fail',e);} }
 
-    const quotaInfo = quota && !user?.is_pro ? (
+    const quotaInfo = (quota && (!user || !user.is_pro)) ? (
       <div style={{fontSize:11,background:'var(--bg-alt)',padding:'6px 10px',border:'1px solid var(--border)',borderRadius:8,marginBottom:14}}>
         Download preventivi oggi: {quota.usage.quoteDownloadsToday}/{quota.limits.quoteDownloadsPerDay} {quota.usage.quoteDownloadsToday>=quota.limits.quoteDownloadsPerDay? ' (Limite raggiunto)': ''}
       </div>
@@ -61,9 +74,7 @@
       {quotaInfo}
       {showUpgrade && <UpgradeBanner variant={variant} onUpgrade={upgrade} />}
       <section className="grid">
-        {pins.length>0 && <div style={{gridColumn:'1/-1',marginBottom:8}}><h3 style={{margin:0,fontSize:18}}>Pinned</h3></div>}
-        {pins.length>0 && tools.filter(t=>pins.includes(t.key)).map(t=> <ToolCard key={'p_'+t.key} tool={t} onUse={handleUse} user={user} pinned={true} onTogglePin={togglePin} />)}
-        {tools.filter(t=>!pins.includes(t.key)).map(t=> <ToolCard key={t.key} tool={t} onUse={handleUse} user={user} pinned={pins.includes(t.key)} onTogglePin={togglePin} />)}
+        {tools.map(t=> <ToolCard key={t.key} tool={t} onUse={handleUse} user={user} />)}
       </section>
       {ats.length>0 && <div style={{marginTop:24,fontSize:12,color:'#6b7280'}}>Suggerimenti: {ats.map(a=>a.tool+':'+a.reason).join(', ')}</div>}
     </div>;

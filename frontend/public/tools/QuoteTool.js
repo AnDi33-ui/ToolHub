@@ -8,8 +8,8 @@ function QuoteTool(){
   const [convertTo,setConvertTo] = React.useState('');
   const [rateOverride,setRateOverride] = React.useState('');
   const [templates,setTemplates] = React.useState([]);
-  const [token,setToken] = React.useState(null);
-  React.useEffect(()=>{ try{ const t=localStorage.getItem('sessionToken'); if(t) setToken(t);}catch(_){ } },[]);
+  const [user,setUser] = React.useState(null);
+  React.useEffect(()=>{ fetch(API_BASE + '/api/auth/me',{credentials:'include'}).then(r=>r.json()).then(j=>{ if(j.ok) setUser(j.user); }).catch(()=>{}); },[]);
   const [logo,setLogo] = React.useState(null);
   const [vat,setVat] = React.useState(22);
   const [note,setNote] = React.useState('Grazie per la preferenza. Pagamento a 30 giorni.');
@@ -32,7 +32,8 @@ function QuoteTool(){
     setBusy(true); setError('');
     try{
   const payload = { lineItems: items, currency, discount: parseFloat(discount)||0, vatRate: parseFloat(vat)||0, notes: note, client: client.name, clientAddress: client.address, company:{ name: company.name, address: company.address }, logo, convertTo: convertTo||undefined, rateOverride: rateOverride||undefined };
-  const r = await fetch(API_BASE + '/api/export/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(!user){ setError('Login richiesto'); setBusy(false); return; }
+  const r = await fetch(API_BASE + '/api/export/quote',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
       if(!r.ok){ const j = await r.json(); setError(j.error||'Errore'); }
       else { const blob = await r.blob(); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='preventivo.pdf'; a.click(); URL.revokeObjectURL(url); }
     }catch(err){ setError('Errore rete: '+err.message); }
@@ -41,21 +42,21 @@ function QuoteTool(){
   function onLogo(e){ const file = e.target.files && e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = ev=> setLogo(ev.target.result); reader.readAsDataURL(file); }
   const { subtotal, disc, vatAmount, total } = totals();
   async function saveTemplate(){
-    if(!token){ alert('Login richiesto'); return; }
+    if(!user){ alert('Login richiesto'); return; }
     const name = prompt('Nome template:'); if(!name) return;
     const payload = { lineItems: items, currency, discount, vatRate: vat, notes: note, client, company };
     try{
-      const r = await fetch(API_BASE + '/api/templates/quote',{method:'POST',headers:{'Content-Type':'application/json','x-session-token':token},body:JSON.stringify({name,payload})});
+  const r = await fetch(API_BASE + '/api/templates/quote',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({name,payload})});
       const j = await r.json(); if(!j.ok) alert('Errore: '+j.error); else { loadTemplates(); }
     }catch(err){ alert('Errore rete: '+err.message); }
   }
   async function loadTemplates(){
-    if(!token){ alert('Login per caricare template'); return; }
-    try{ const r=await fetch(API_BASE + '/api/templates/quote',{headers:{'x-session-token':token}}); const j=await r.json(); if(j.ok) setTemplates(j.items||[]); }catch(err){ console.warn(err); }
+    if(!user){ alert('Login per caricare template'); return; }
+    try{ const r=await fetch(API_BASE + '/api/templates/quote',{credentials:'include'}); const j=await r.json(); if(j.ok) setTemplates(j.items||[]); }catch(err){ console.warn(err); }
   }
   async function applyTemplate(id){
-    if(!token) return;
-    try{ const r=await fetch(API_BASE + '/api/templates/quote/'+id,{headers:{'x-session-token':token}}); const j=await r.json(); if(j.ok){ const p=j.item.payload; if(p.lineItems) setItems(p.lineItems); if(p.currency) setCurrency(p.currency); if(p.discount!=null) setDiscount(p.discount); if(p.vatRate!=null) setVat(p.vatRate); if(p.notes) setNote(p.notes); if(p.client) setClient({name:p.client,address:p.clientAddress||''}); if(p.company) setCompany({name:p.company.name,address:p.company.address}); }
+    if(!user) return;
+    try{ const r=await fetch(API_BASE + '/api/templates/quote/'+id,{credentials:'include'}); const j=await r.json(); if(j.ok){ const p=j.item.payload; if(p.lineItems) setItems(p.lineItems); if(p.currency) setCurrency(p.currency); if(p.discount!=null) setDiscount(p.discount); if(p.vatRate!=null) setVat(p.vatRate); if(p.notes) setNote(p.notes); if(p.client) setClient({name:p.client,address:p.clientAddress||''}); if(p.company) setCompany({name:p.company.name,address:p.company.address}); }
     }catch(err){ console.warn(err); }
   }
   return (
@@ -118,7 +119,7 @@ function QuoteTool(){
                 {templates.map(t=> <button type="button" key={t.id} className="btn secondary" onClick={()=>applyTemplate(t.id)}>{t.name}</button>)}
               </div>
             )}
-            {!token && <div style={{fontSize:11,opacity:.7}}>Login per salvare template.</div>}
+            {!user && <div style={{fontSize:11,opacity:.7}}>Login per salvare template.</div>}
           </div>
         </details>
         <details>
