@@ -34,11 +34,19 @@ function UpgradeBanner({variant, onUpgrade}){
   );
 }
 
-function ToolCard({ tool, onUse }){
+function ToolCard({ tool, onUse, user, pinned, onTogglePin }){
   return (
     <div className="card">
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <h3>{tool.title}</h3>
+        <h3 style={{display:'flex',alignItems:'center',gap:6}}>
+          {tool.title}
+          {user && (
+            <button type="button" aria-label={pinned? 'Unpin':'Pin'} onClick={()=>onTogglePin(tool.key)}
+              style={{border:'none',background:'transparent',cursor:'pointer',fontSize:18,lineHeight:1,padding:0}}>
+              {pinned? '★':'☆'}
+            </button>
+          )}
+        </h3>
         <div>
           <span className={"badge "+(tool.pro? 'pro':'base')}>{tool.pro? 'Pro':'Base'}</span>
         </div>
@@ -70,6 +78,7 @@ function App(){
   const [variant, setVariant] = useState('A');
   const [ats, setAts] = useState([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [pins,setPins] = useState([]);
 
   useEffect(()=>{
     const m = document.cookie.match(/variant=([^;]+)/); if(m) setVariant(m[1]);
@@ -88,13 +97,13 @@ function App(){
     const email = prompt('Email per registrazione:');
     if(!email) return;
   const r = await fetch(API_BASE + '/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
-    const j = await r.json(); if(j.ok){ setToken(j.token); setUser(j.user); }
+    const j = await r.json(); if(j.ok){ setToken(j.token); setUser(j.user); try{ localStorage.setItem('sessionToken', j.token); }catch(_){} loadPins(j.token); }
   }
   async function login(){
     const email = prompt('Email per login:');
     if(!email) return;
   const r = await fetch(API_BASE + '/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
-    const j = await r.json(); if(j.ok){ setToken(j.token); setUser(j.user); }
+    const j = await r.json(); if(j.ok){ setToken(j.token); setUser(j.user); try{ localStorage.setItem('sessionToken', j.token); }catch(_){} loadPins(j.token); }
   }
   async function upgrade(){
     if(!token){ alert('Prima registrati/login'); return; }
@@ -107,6 +116,22 @@ function App(){
   fetch(API_BASE + '/api/usage', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ toolKey:key }) });
     window.open(`/tool.html?tool=${key}`,'_blank','noopener');
   }
+
+  async function loadPins(tok){
+    const t = tok || token; if(!t) return;
+    try{ const r = await fetch(API_BASE + '/api/pins',{headers:{'x-session-token':t}}); const j= await r.json(); if(j.ok) setPins(j.items||[]); }catch(_){ }
+  }
+  async function togglePin(toolKey){
+    if(!token){ alert('Prima effettua login'); return; }
+    const isPinned = pins.includes(toolKey);
+    try{
+      if(isPinned){ await fetch(API_BASE + '/api/pins/'+toolKey,{method:'DELETE',headers:{'x-session-token':token}}); setPins(pins.filter(p=>p!==toolKey)); }
+      else { await fetch(API_BASE + '/api/pins',{method:'POST',headers:{'Content-Type':'application/json','x-session-token':token},body:JSON.stringify({toolKey})}); setPins([...pins,toolKey]); }
+    }catch(err){ console.warn('Pin toggle failed',err); }
+  }
+
+  // Load pins from localStorage session on mount (if token persisted)
+  useEffect(()=>{ try{ const t = localStorage.getItem('sessionToken'); if(t && !token){ setToken(t); loadPins(t); } }catch(_){ } },[]);
 
   useEffect(()=>{
     if(showUpgrade){
@@ -127,7 +152,17 @@ function App(){
         </div>
       </section>
       <section id="tools" className="grid">
-        {tools.map(t=> (<ToolCard key={t.key} tool={t} onUse={handleUse} />))}
+        {pins.length>0 && (
+          <div style={{gridColumn:'1/-1',marginBottom:8}}>
+            <h2 style={{fontSize:18,margin:0}}>Pinned</h2>
+          </div>
+        )}
+        {pins.length>0 && tools.filter(t=>pins.includes(t.key)).map(t=> (
+          <ToolCard key={'pinned-'+t.key} tool={t} onUse={handleUse} user={user} pinned={true} onTogglePin={togglePin} />
+        ))}
+        {tools.filter(t=>!pins.includes(t.key)).map(t=> (
+          <ToolCard key={t.key} tool={t} onUse={handleUse} user={user} pinned={pins.includes(t.key)} onTogglePin={togglePin} />
+        ))}
       </section>
       {ats.length>0 && <div style={{marginTop:24,fontSize:12,color:'#6b7280'}}>Suggerimenti: {ats.map(a=>a.tool+':'+a.reason).join(', ')}</div>}
     </div>

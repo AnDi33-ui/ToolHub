@@ -1,0 +1,1 @@
+(async()=>{ try { const r = await fetch('http://localhost:3000/health/full'); console.log('status', r.status); console.log(await r.text()); } catch(e){ console.error('ERR', e); process.exit(1);} })();

@@ -18,6 +18,8 @@ async function main(){
   await check('usage', async()=> (await fetchFn(base+'/api/usage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({toolKey:'bmi'})})).status);
   await check('ats', async()=> (await fetchFn(base+'/api/ats')).status);
   await check('analytics', async()=> (await fetchFn(base+'/api/analytics')).status);
+  await check('health_full', async()=> (await fetchFn(base+'/health/full')).status);
+  await check('analytics_csv', async()=> { const r=await fetchFn(base+'/api/analytics/export'); return r.ok && (r.headers.get('content-type')||'').includes('text/csv') ? r.status : 'NO_CSV'; });
   console.table(results);
   const fails = Object.values(results).filter(v=> !(v===200 || v===201));
   if(fails.length){ process.exitCode = 1; }
