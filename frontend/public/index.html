@@ -1,53 +1,118 @@
 <!doctype html>
 <html lang="it">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width,initial-scale=1" />
-		<title>ToolHub - Strumenti utili</title>
-		<link rel="stylesheet" href="/style.css" />
-		<script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
-		<script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
-		<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-		<style>
-		/* Anti-flicker: nasconde contenuto finché App React non è montata */
-		body.preload .navbar,
-		body.preload main#root,
-		body.preload #prossimamente,
-		body.preload #contact,
-		body.preload footer,
-		body.preload .theme-toggle { opacity:0; }
-		body.app-ready .navbar,
-		body.app-ready main#root,
-		body.app-ready #prossimamente,
-		body.app-ready #contact,
-		body.app-ready footer,
-		body.app-ready .theme-toggle { opacity:1; transition:opacity .25s ease; }
-		</style>
-	</head>
-	<body class="preload">
-		<nav class="navbar">
-			<div class="logo">ToolHub</div>
-			<ul class="navlinks">
-				<li><a href="#">Home</a></li>
-				<li><a href="#tools">Tools</a></li>
-				<li><a href="#pro">Pro</a></li>
-				<li><a href="#contact">Contatti</a></li>
-			</ul>
-		</nav>
-		<main id="root"></main>
-		<section id="prossimamente" class="mt-lg fade-in" style="max-width:1280px;margin:0 auto;padding:0 clamp(16px,5vw,64px);">
-			<h2 style="margin:0 0 12px;font-size:1.6rem">Prossimamente</h2>
-			<ul class="coming-list">
-				<li class="coming-item">Calendarizzatore social media (Pro)</li>
-				<li class="coming-item">Generatore di fatture con template brand (Pro)</li>
-				<li class="coming-item">Esportazione Flashcard in Anki format</li>
-				<li class="coming-item">API privata per automazioni aziendali (Pro Business)</li>
-			</ul>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<title>ToolHub – Strumenti smart per studenti, freelance e PMI</title>
+	<link rel="stylesheet" href="/style.css" />
+	<style>
+		body.preload .navbar,body.preload main,body.preload footer,body.preload .theme-toggle{opacity:0;}
+		body.app-ready .navbar,body.app-ready main,body.app-ready footer,body.app-ready .theme-toggle{opacity:1;transition:opacity .35s ease;}
+		.hero-landing{padding:70px 0 40px;display:grid;gap:46px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:center;}
+		.hero-visual{position:relative;min-height:260px;}
+		.glow{position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,rgba(var(--accent-rgb)/.35),transparent 60%);filter:blur(40px);opacity:.7;}
+		.cta-group{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;}
+		.features-grid{display:grid;gap:26px;margin-top:40px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));}
+		.feature-card{background:var(--bg-alt);border:1px solid var(--border);padding:20px 18px 22px;border-radius:var(--radius);position:relative;box-shadow:var(--shadow-sm);}
+		.feature-card h3{margin:0 0 8px;font-size:1rem;}
+		.mini-badge{font-size:.55rem;background:var(--accent-gradient);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700;letter-spacing:.8px;}
+		.pricing{margin-top:70px;display:grid;gap:32px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}
+		.price-card{background:var(--bg-alt);border:1px solid var(--border);padding:24px 22px;border-radius:var(--radius-lg);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px;position:relative;}
+		.price-card.pro{border:2px solid rgba(var(--accent-rgb)/.55);box-shadow:var(--shadow-lg);}
+		.price-tag{font-size:2.1rem;font-weight:600;line-height:1;display:flex;align-items:flex-end;gap:4px;}
+		.steps{display:grid;gap:26px;margin-top:60px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));counter-reset:s;}
+		.step{background:var(--bg-alt);border:1px solid var(--border);padding:20px;border-radius:var(--radius-sm);position:relative;}
+		.step:before{counter-increment:s;content:counter(s);position:absolute;top:-12px;left:-12px;background:var(--accent-gradient);color:#fff;font-size:.7rem;font-weight:600;border-radius:var(--radius-pill);padding:6px 9px;box-shadow:var(--shadow);}
+		.nav-auth-buttons{display:flex;gap:10px;}
+		.nav-auth-buttons .btn{font-size:.7rem;padding:8px 14px;}
+		/* Modal auth */
+		.hidden{display:none!important;}
+	</style>
+</head>
+<body class="preload">
+	<nav class="navbar">
+		<div class="logo"><a href="/" style="text-decoration:none;color:inherit">ToolHub</a></div>
+		<ul class="navlinks">
+			<li><a href="/" class="active">Home</a></li>
+			<li><a href="/tools.html">Strumenti</a></li>
+			<li><a href="#pricing">Prezzi</a></li>
+			<li><a href="#contact">Contatti</a></li>
+		</ul>
+		<div class="nav-auth nav-auth-buttons" id="nav-auth"></div>
+	</nav>
+	<main class="container">
+		<section class="hero-landing">
+			<div>
+				<h1 style="margin:0 0 14px;">Strumenti veloci. Zero complicazioni.</h1>
+				<p style="font-size:1.05rem;color:var(--text-light);max-width:640px;margin:0 0 18px">Un hub di micro‑tool per migliorare produttività e branding: converti PDF, genera preventivi multi‑valuta, crea flashcard stampabili, calcola IMC e tasse freelance. Cresci da Base a Pro quando hai bisogno di più potenza.</p>
+				<div class="cta-group">
+					<a href="/tools.html" class="btn">Vai agli Strumenti →</a>
+					<button class="btn secondary" id="open-register">Registrati</button>
+					<button class="btn outline" id="open-login">Login</button>
+				</div>
+				<div style="margin-top:14px;font-size:.7rem;letter-spacing:.6px;color:var(--text-mute)">Nessun installatore • Salvataggio locale • PDF generati server-side</div>
+			</div>
+			<div class="hero-visual">
+				<div class="glow"></div>
+				<div style="position:relative;z-index:2;display:grid;gap:14px;">
+					<div class="card" style="margin:0;min-height:unset;padding:16px 18px;">
+						<strong style="font-size:.75rem;letter-spacing:.8px;color:var(--text-light)">PREVIEW PREVENTIVO</strong>
+						<div style="height:90px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.65rem;color:var(--text-mute);">PDF Layout</div>
+					</div>
+					<div class="card" style="margin:0;min-height:unset;padding:16px 18px;">
+						<strong style="font-size:.75rem;letter-spacing:.8px;color:var(--text-light)">FLASHCARDS</strong>
+						<div style="display:flex;gap:6px;flex-wrap:wrap;font-size:.55rem;">
+							<span class="badge">JS</span><span class="badge">VAT</span><span class="badge">UX</span><span class="badge">SQL</span><span class="badge">BMI</span>
+						</div>
+					</div>
+				</div>
+			</div>
 		</section>
-		<section id="contact" class="mt-lg fade-in" style="max-width:1280px;margin:0 auto;padding:40px clamp(16px,5vw,64px);">
-			<h2 style="margin:0 0 12px;font-size:1.6rem">Contatti & Supporto</h2>
-			<p style="margin:0 0 18px;color:var(--text-light);max-width:640px">Hai feedback, richieste di strumenti o vuoi testare la versione Pro? Inviaci un messaggio o unisciti alla waitlist.</p>
-			<form id="contact-form" class="fade-in" style="max-width:520px;display:grid;gap:14px">
+
+		<section id="features" style="margin-top:10px;">
+			<h2 style="margin:0 0 8px">Cosa puoi fare</h2>
+			<p style="margin:0 0 24px;color:var(--text-light);max-width:780px">Ogni tool è pensato per essere immediato. Nessuna curva di apprendimento, solo azione.</p>
+			<div class="features-grid">
+				<div class="feature-card"><h3>Converti PDF ↔ JPG</h3><p class="text-light">Conversioni rapide lato client / server demo, zip multipli.</p><span class="mini-badge">FREE</span></div>
+				<div class="feature-card"><h3>Preventivi PDF Pro</h3><p class="text-light">Multi‑valuta, sconto, IVA, template riutilizzabili.</p><span class="mini-badge">PRO</span></div>
+				<div class="feature-card"><h3>Flashcard Studio</h3><p class="text-light">Generi, salvi mazzi e li esporti in PDF per studiare.</p><span class="mini-badge">FREE</span></div>
+				<div class="feature-card"><h3>Tasse Freelance</h3><p class="text-light">Stime veloci costi e margini per decisioni immediate.</p><span class="mini-badge">PRO</span></div>
+			</div>
+		</section>
+
+		<section class="steps" style="margin-top:70px;" aria-label="Come funziona">
+			<div class="step"><h3>1. Scegli</h3><p class="text-light">Apri lo strumento che ti serve dal catalogo.</p></div>
+			<div class="step"><h3>2. Usa</h3><p class="text-light">Compila, converte, genera file o calcola in pochi click.</p></div>
+			<div class="step"><h3>3. Cresci</h3><p class="text-light">Aggiorna a Pro quando raggiungi i limiti free.</p></div>
+		</section>
+
+		<section id="pricing" style="margin-top:80px;">
+			<h2 style="margin:0 0 8px">Prezzi trasparenti</h2>
+			<p style="margin:0 0 26px;color:var(--text-light);max-width:720px">Inizia gratis. Passa a Pro solo se i tool diventano parte del tuo workflow quotidiano.</p>
+			<div class="pricing">
+				<div class="price-card">
+					<div style="font-size:.75rem;letter-spacing:1px;font-weight:600;color:var(--text-light)">BASE</div>
+					<div class="price-tag">0€<span style="font-size:.7rem;font-weight:500;">/sempre</span></div>
+					<ul style="list-style:none;margin:0;padding:0;font-size:.72rem;display:grid;gap:6px;color:var(--text-light)">
+						<li>• Tutti i tool Free</li><li>• 3 download preventivi / giorno</li><li>• Aggiornamenti continui</li>
+					</ul>
+					<button class="btn secondary" id="pricing-register">Crea account</button>
+				</div>
+				<div class="price-card pro">
+					<div style="font-size:.75rem;letter-spacing:1px;font-weight:600;color:var(--text-light)">PRO</div>
+					<div class="price-tag" style="background:var(--accent-gradient);-webkit-background-clip:text;background-clip:text;color:transparent;">9€<span style="font-size:.7rem;font-weight:500;color:var(--text-light);">/mese</span></div>
+					<ul style="list-style:none;margin:0;padding:0;font-size:.72rem;display:grid;gap:6px;color:var(--text-light)">
+						<li>• Download illimitati</li><li>• Template preventivi</li><li>• Pin strumenti</li><li>• Priorità roadmap</li>
+					</ul>
+					<button class="btn" id="pricing-login">Passa a Pro</button>
+				</div>
+			</div>
+		</section>
+
+		<section id="contact" style="margin-top:90px;">
+			<h2 style="margin:0 0 10px">Contatti & Supporto</h2>
+			<p style="margin:0 0 18px;color:var(--text-light);max-width:640px">Hai feedback, richieste o vuoi partecipare alla beta? Scrivici.</p>
+			<form id="contact-form" style="max-width:520px;display:grid;gap:14px">
 				<input name="email" type="email" placeholder="La tua email" required />
 				<textarea name="message" rows="4" placeholder="Messaggio / feedback" required></textarea>
 				<div style="display:flex;gap:12px;flex-wrap:wrap">
@@ -57,43 +122,37 @@
 				<div id="contact-status" style="font-size:.75rem;color:var(--text-light)"></div>
 			</form>
 		</section>
-		<footer>
-			<div class="cols">
-				<div>
-					<strong>ToolHub</strong><br />
-					<span style="font-size:.7rem">Freemium toolkit per produttività quotidiana.</span>
+	</main>
+	<footer>
+		<div class="cols">
+			<div><strong>ToolHub</strong><br /><span style="font-size:.7rem">Freemium toolkit per produttività quotidiana.</span></div>
+			<div><strong>Link</strong><br /><a href="/tools.html">Tools</a><br /><a href="#pricing">Prezzi</a><br /><a href="#contact">Contatti</a></div>
+			<div><strong>Social</strong><br /><a href="#" class="share-link" data-net="twitter">Twitter</a><br /><a href="#" class="share-link" data-net="linkedin">LinkedIn</a><br /><a href="#" class="share-link" data-net="facebook">Facebook</a></div>
+			<div><strong>Legale</strong><br /><a href="#">Privacy</a><br /><a href="#">Termini</a></div>
+		</div>
+		<div>© <span id="year"></span> ToolHub – Demo. Tutti i diritti riservati.</div>
+	</footer>
+	<button class="btn secondary theme-toggle" id="themeToggle" aria-label="Toggle dark mode">🌗</button>
+
+	<!-- Auth Modals -->
+	<div class="modal-backdrop hidden" id="auth-backdrop">
+		<div class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+			<h3 id="auth-title" style="margin-top:0;">Account</h3>
+			<form id="auth-form" style="display:grid;gap:14px;">
+				<input type="email" id="auth-email" placeholder="Email" required />
+				<div style="display:flex;gap:10px;">
+					<button class="btn" id="auth-submit" type="submit">Continua</button>
+					<button type="button" class="btn secondary" id="auth-cancel">Chiudi</button>
 				</div>
-				<div>
-					<strong>Link</strong><br />
-					<a href="#tools">Tools</a><br />
-					<a href="#prossimamente">Prossimamente</a><br />
-					<a href="#contact">Contatti</a>
-				</div>
-				<div>
-					<strong>Social</strong><br />
-					<a href="#" class="share-link" data-net="twitter">Twitter</a><br />
-					<a href="#" class="share-link" data-net="linkedin">LinkedIn</a><br />
-					<a href="#" class="share-link" data-net="facebook">Facebook</a>
-				</div>
-				<div>
-					<strong>Legale</strong><br />
-					<a href="#">Privacy</a><br />
-					<a href="#">Termini</a>
-				</div>
-			</div>
-			<div>© <span id="year"></span> ToolHub – Demo. Tutti i diritti riservati.</div>
-		</footer>
-		<button class="btn secondary theme-toggle" id="themeToggle" aria-label="Toggle dark mode">🌗</button>
-		<script type="text/babel" src="/tools/PdfJpgTool.js"></script>
-		<script type="text/babel" src="/tools/BmiTool.js"></script>
-		<script type="text/babel" src="/tools/QuoteTool.js"></script>
-		<script type="text/babel" src="/tools/FlashcardTool.js"></script>
-		<script type="text/babel" src="/tools/TaxesTool.js"></script>
-		<!-- API base override to puntare sempre al backend API su :3000 -->
-		<script>
-			window.API_BASE = 'http://localhost:3000';
-			console.log('[ToolHub] API_BASE override attivo:', window.API_BASE);
-		</script>
-		<script type="text/babel" src="/script.js"></script>
-	</body>
+				<div id="auth-status" style="font-size:.7rem;color:var(--text-light)"></div>
+			</form>
+			<div style="margin-top:10px;font-size:.65rem;color:var(--text-mute)" id="auth-mode-note">Registrazione nuova.</div>
+		</div>
+	</div>
+
+	<script>
+		window.API_BASE = 'http://localhost:3000';
+	</script>
+	<script src="/landing.js" type="text/babel"></script>
+</body>
 </html>

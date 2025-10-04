@@ -144,6 +144,12 @@ footer a:hover { color:var(--text); }
 ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:100px; }
 body.dark ::-webkit-scrollbar-thumb { background:#475569; }
 
+/* Landing specific enhancements */
+.navlinks a.active { color:var(--text); }
+.navlinks a.active:after { width:100%; }
+.feature-card { transition:transform var(--transition), box-shadow var(--transition), border-color var(--transition); }
+.feature-card:hover { transform:translateY(-4px); border-color:rgba(var(--accent-rgb)/.4); box-shadow:var(--shadow-lg); }
+
 /* Responsive */
 @media (max-width:860px) {
 	.navlinks { gap:16px; }

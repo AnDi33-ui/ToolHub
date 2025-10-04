@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ToolHub - Strumenti</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <style>body.preload .navbar,body.preload main#tools-root,body.preload footer,body.preload .theme-toggle{opacity:0;}body.app-ready .navbar,body.app-ready main#tools-root,body.app-ready footer,body.app-ready .theme-toggle{opacity:1;transition:opacity .25s ease;}</style>
+</head>
+<body class="preload">
+  <nav class="navbar">
+    <div class="logo"><a href="/" style="text-decoration:none;color:inherit">ToolHub</a></div>
+    <ul class="navlinks">
+      <li><a href="/">Home</a></li>
+      <li><a href="/tools.html" class="active">Strumenti</a></li>
+      <li><a href="/#pricing">Prezzi</a></li>
+      <li><a href="/#contact">Contatti</a></li>
+    </ul>
+    <div class="nav-auth" id="nav-auth"></div>
+  </nav>
+  <main id="tools-root" class="container" style="padding-top:42px;"></main>
+  <footer>
+    <div class="cols">
+      <div><strong>ToolHub</strong><br /><span style="font-size:.7rem">Freemium toolkit per produttività quotidiana.</span></div>
+      <div><strong>Link</strong><br /><a href="/tools.html">Tools</a><br /><a href="/#pricing">Prezzi</a><br /><a href="/#contact">Contatti</a></div>
+      <div><strong>Social</strong><br /><a href="#" class="share-link" data-net="twitter">Twitter</a><br /><a href="#" class="share-link" data-net="linkedin">LinkedIn</a><br /><a href="#" class="share-link" data-net="facebook">Facebook</a></div>
+      <div><strong>Legale</strong><br /><a href="#">Privacy</a><br /><a href="#">Termini</a></div>
+    </div>
+    <div>© <span id="year"></span> ToolHub – Demo.</div>
+  </footer>
+  <button class="btn secondary theme-toggle" id="themeToggle" aria-label="Toggle dark mode">🌗</button>
+  <!-- Tools React components -->
+  <script type="text/babel" src="/tools/PdfJpgTool.js"></script>
+  <script type="text/babel" src="/tools/BmiTool.js"></script>
+  <script type="text/babel" src="/tools/QuoteTool.js"></script>
+  <script type="text/babel" src="/tools/FlashcardTool.js"></script>
+  <script type="text/babel" src="/tools/TaxesTool.js"></script>
+  <!-- Tools App Script -->
+  <script type="text/babel" src="/toolsApp.js"></script>
+</body>
+</html>
