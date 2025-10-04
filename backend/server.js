@@ -192,6 +192,41 @@ function runAsync(sql,p=[]) { return new Promise((res,rej)=> db.run(sql,p,functi
 function allAsync(sql,p=[]) { return new Promise((res,rej)=> db.all(sql,p,(err,rows)=> err?rej(err):res(rows))); }
 function formatMoney(amount,currency='EUR'){ try{ return new Intl.NumberFormat('it-IT',{style:'currency',currency}).format(Number(amount||0)); }catch{ return (currency==='EUR'?'€':'')+Number(amount||0).toFixed(2);} }
 
+// --- Template Engine (simple placeholder replacement) ---
+// Supported placeholders: {{company.name}} {{company.address}} {{company.piva}} {{company.codice_fiscale}} {{company.regime_fiscale}}
+// {{defaults.vatRate}} {{defaults.currency}} {{defaults.noteFooter}} {{client.name}} {{client.address}} {{today}}
+// Unknown placeholders => replaced with '' and logged in debug mode (NODE_ENV!=='production')
+async function getBusinessProfile(userId){
+  try { const rows = await allAsync('SELECT * FROM business_profile WHERE user_id=?',[userId]); return rows.length? rows[0]: null; } catch { return null; }
+}
+function buildTemplateContext({ profile, client=null }){
+  const today = new Date().toISOString().slice(0,10);
+  const company = {
+    name: profile?.ragione_sociale || 'La Mia Azienda',
+    address: profile?.indirizzo || '',
+    piva: profile?.piva || '',
+    codice_fiscale: profile?.codice_fiscale || '',
+    regime_fiscale: profile?.regime_fiscale || ''
+  };
+  const defaults = {
+    vatRate: profile?.aliquota_iva_default ?? '',
+    currency: profile?.currency_default || 'EUR',
+    noteFooter: profile?.note_footer_default || ''
+  };
+  return { company, client: client || {}, defaults, today };
+}
+function applyTemplate(str, ctx){
+  if(!str || typeof str!=='string') return str;
+  return str.replace(/{{\s*([a-zA-Z0-9_\.]+)\s*}}/g, (m, key)=>{
+    const parts = key.split('.');
+    let cur = ctx;
+    for(const p of parts){ if(cur && Object.prototype.hasOwnProperty.call(cur,p)) cur=cur[p]; else { if(process.env.NODE_ENV!=='production') console.log('[template] placeholder ignoto', key); return ''; } }
+    if(cur==null) return '';
+    return String(cur);
+  });
+}
+
+
 // (Old minimal email-only auth removed in favor of password-based implementation below)
 
 app.post('/api/pro/upgrade', requireUser, async (req, res) => {
@@ -445,6 +480,14 @@ app.get('/api/ats', async (req, res) => {
 app.post('/api/export/quote', requireUser, exportLimiter, async (req,res)=>{
   const payload=req.body||{}; const userId=req.userId;
   try{ const allowed=await checkBaseLimit(userId,'quote'); if(!allowed) return res.status(429).json({ok:false,error:'Limite giornaliero raggiunto per piano Base. Passa a Pro per download illimitati.'}); await runAsync('INSERT INTO downloads (user_id,tool_key) VALUES (?,?)',[userId,'quote']); }catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  const profile = await getBusinessProfile(userId);
+  const ctx = buildTemplateContext({ profile, client: { name: payload.client || payload.clientName || (payload.client && payload.client.name) || 'Cliente', address: payload.clientAddress || '' } });
+  // Merge defaults for missing currency / vat / notes
+  if(!payload.currency && ctx.defaults.currency) payload.currency = ctx.defaults.currency;
+  if((payload.taxRate==null || payload.taxRate==='') && ctx.defaults.vatRate!=='') payload.taxRate = ctx.defaults.vatRate;
+  if(!payload.notes && ctx.defaults.noteFooter) payload.notes = ctx.defaults.noteFooter;
+  // Apply template placeholders in notes (and optional company fields if passed as strings with placeholders)
+  if(payload.notes) payload.notes = applyTemplate(payload.notes, ctx);
   const doc=new PDFDocument(); res.setHeader('Content-disposition','attachment; filename=quote.pdf'); res.setHeader('Content-type','application/pdf'); doc.pipe(res);
   const primary='#1e3a8a'; const light='#64748b'; const currency=payload.currency||'EUR'; const convertTo = payload.convertTo || null; const rateOverride = parseFloat(payload.rateOverride)||null;
   const STATIC_RATES={ 'EUR_USD':1.07,'USD_EUR':0.93,'EUR_GBP':0.85,'GBP_EUR':1.17 };
@@ -452,9 +495,14 @@ app.post('/api/export/quote', requireUser, exportLimiter, async (req,res)=>{
   function money(amount,cur=currency){ try{ return new Intl.NumberFormat('it-IT',{style:'currency',currency:cur}).format(Number(amount||0)); }catch{ return (cur==='EUR'?'€':'')+Number(amount||0).toFixed(2);} }
   const logoSize=42; if(payload.logo && typeof payload.logo==='string' && payload.logo.startsWith('data:image')){ try{ doc.image(Buffer.from(payload.logo.split(',')[1],'base64'),40,40,{fit:[logoSize,logoSize]}); }catch{ doc.rect(40,40,logoSize,logoSize).fillOpacity(0.05).fill(primary).fillOpacity(1);} } else { doc.rect(40,40,logoSize,logoSize).fillOpacity(0.05).fill(primary).fillOpacity(1); }
   doc.fillColor(primary).fontSize(22).text('PREVENTIVO',100,48); const today=new Date().toISOString().slice(0,10); doc.fontSize(10).fillColor(light).text(`Data: ${today}`,100,78); doc.fontSize(10).fillColor(light).text(`Documento # ${Math.random().toString(36).slice(2,8).toUpperCase()}`,100,92);
-  // Seller & customer
-  doc.fontSize(11).fillColor(primary).text('FORNITORE',40,130); doc.fontSize(10).fillColor(light).text((payload.from&&payload.from.name)||'La Mia Azienda',40,146);
-  doc.fontSize(11).fillColor(primary).text('CLIENTE',300,130); doc.fontSize(10).fillColor(light).text((payload.to&&payload.to.name)||'Cliente',300,146);
+  // Seller & customer using profile + context
+  doc.fontSize(11).fillColor(primary).text('FORNITORE',40,130);
+  const companyLine = ctx.company.name + (ctx.company.piva? ` (P.IVA ${ctx.company.piva})`: '');
+  doc.fontSize(10).fillColor(light).text(companyLine,40,146);
+  if(ctx.company.address) doc.text(ctx.company.address,40,160);
+  doc.fontSize(11).fillColor(primary).text('CLIENTE',300,130);
+  doc.fontSize(10).fillColor(light).text(ctx.client.name||'Cliente',300,146);
+  if(ctx.client.address) doc.text(ctx.client.address,300,160);
   // Items table
   let items = Array.isArray(payload.items)?payload.items:[]; const startY=200; doc.moveTo(40,startY).lineTo(555,startY).strokeColor(primary).stroke(); doc.fontSize(10).fillColor(primary).text('DESCRIZIONE',45,startY+8); doc.text('QTA',300,startY+8); doc.text('PREZZO',360,startY+8); doc.text('TOTALE',450,startY+8);
   let y=startY+26; let subtotal=0; items.forEach(it=>{ const lineTotal=(Number(it.qty)||0)*(Number(it.price)||0); subtotal+=lineTotal; doc.fillColor('#000').fontSize(10).text(it.desc||'',45,y,{width:240}); doc.text(String(it.qty||''),300,y); doc.text(money(it.price||0),360,y); doc.text(money(lineTotal),450,y); y+=18; if(y>700){ doc.addPage(); y=60; }});
@@ -546,11 +594,23 @@ app.get('/api/invoices/:id/pdf', requireUser, async (req,res)=>{
     const rows=await allAsync('SELECT * FROM invoices WHERE id=? AND user_id=?',[req.params.id,req.userId]); if(!rows.length) return res.status(404).json({ok:false,error:'not found'});
     const inv=rows[0]; let payload={}; try{ payload=JSON.parse(inv.payload);}catch{}
     const clientRows=await allAsync('SELECT name,vat,address FROM clients WHERE id=?',[inv.client_id]); const client=clientRows[0]||{};
+    const profile = await getBusinessProfile(req.userId);
+    const ctx = buildTemplateContext({ profile, client:{ name: client.name, address: client.address } });
+    // Merge defaults for currency / vat if missing in stored payload
+    if((payload.taxRate==null || payload.taxRate==='') && ctx.defaults.vatRate!=='') payload.taxRate = ctx.defaults.vatRate;
+    if(!payload.notes && ctx.defaults.noteFooter) payload.notes = ctx.defaults.noteFooter;
+    if(payload.notes) payload.notes = applyTemplate(payload.notes, ctx);
     const doc=new PDFDocument(); res.setHeader('Content-disposition',`attachment; filename=fattura-${inv.number}.pdf`); res.setHeader('Content-type','application/pdf'); doc.pipe(res);
     const primary='#1e3a8a'; const light='#64748b';
     doc.fillColor(primary).fontSize(22).text('FATTURA',40,48);
     doc.fontSize(10).fillColor(light).text(`Numero: ${inv.number}`,40,78); doc.fontSize(10).fillColor(light).text(`Data: ${new Date(inv.created_at).toISOString().slice(0,10)}`,40,92);
-    doc.fontSize(11).fillColor(primary).text('CLIENTE',40,130); doc.fontSize(10).fillColor(light).text(client.name||'',40,146); if(client.vat) doc.text('P.IVA: '+client.vat,40,160); if(client.address) doc.text(client.address,40,174);
+    // Fornitore (company)
+    doc.fontSize(11).fillColor(primary).text('FORNITORE',40,120);
+    const companyLine = ctx.company.name + (ctx.company.piva? ` (P.IVA ${ctx.company.piva})`: '');
+    doc.fontSize(10).fillColor(light).text(companyLine,40,136);
+    if(ctx.company.address) doc.text(ctx.company.address,40,150);
+    // Cliente
+    doc.fontSize(11).fillColor(primary).text('CLIENTE',300,120); doc.fontSize(10).fillColor(light).text(client.name||'',300,136); if(client.vat) doc.text('P.IVA: '+client.vat,300,150); if(client.address) doc.text(client.address,300,164);
     const items = Array.isArray(payload.items)?payload.items:[]; const startY=210; doc.moveTo(40,startY).lineTo(555,startY).strokeColor(primary).stroke(); doc.fontSize(10).fillColor(primary).text('DESCRIZIONE',45,startY+8); doc.text('QTA',300,startY+8); doc.text('PREZZO',360,startY+8); doc.text('TOTALE',450,startY+8);
     let y=startY+26; let subtotal=0; items.forEach(it=>{ const lineTotal=(Number(it.qty)||0)*(Number(it.price)||0); subtotal+=lineTotal; doc.fillColor('#000').fontSize(10).text(it.desc||'',45,y,{width:240}); doc.text(String(it.qty||''),300,y); doc.text(formatMoney(it.price||0, inv.currency),360,y); doc.text(formatMoney(lineTotal, inv.currency),450,y); y+=18; if(y>700){ doc.addPage(); y=60; }});
     const taxRate=Number(payload.taxRate)||0; const tax=subtotal*taxRate/100; const total=subtotal+tax; doc.fontSize(10).fillColor(primary); doc.text('SUBTOTALE',360,y+10); doc.text('TASSE',360,y+26); doc.text('TOTALE',360,y+42); doc.fillColor('#000'); doc.text(formatMoney(subtotal,inv.currency),450,y+10); doc.text(formatMoney(tax,inv.currency),450,y+26); doc.text(formatMoney(total,inv.currency),450,y+42);
