@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install deps
+        run: npm ci
+      - name: Lint syntax (frontend tools)
+        run: |
+          node --check frontend/public/script.js
+          for f in frontend/public/tools/*.js; do node --check $f; done
+      - name: Run smoke tests
+        run: node scripts/smoke.js
+      - name: Upload smoke output (debug)
+        if: always()
+        run: |
+          echo "Completed at $(date)" > ci_artifact.txt
+      - name: Store artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifact
+          path: ci_artifact.txt
