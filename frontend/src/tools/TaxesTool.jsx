@@ -26,11 +26,12 @@ function compute(regime, inc){
 const REGIMES=['forfettario','ordinario','flat'];
 
 export default function TaxesTool(){
-  const { useState } = React;
+  const { useState, useEffect } = React;
   const [income,setIncome] = useState('');
   const [focusRegime,setFocusRegime] = useState('forfettario');
   const [results,setResults] = useState(null);
   const [msg,setMsg] = useState('');
+  const [profile,setProfile] = useState(null);
 
   function toast(t){ if(window.ToolHubToast){ window.ToolHubToast(t); } else setMsg(t); }
 
@@ -38,6 +39,11 @@ export default function TaxesTool(){
 
   function bestNet(){ if(!results) return null; return results.reduce((a,b)=> b.net>a.net? b:a, results[0]).regime; }
   const highlight = bestNet();
+
+  useEffect(()=>{ track('taxes_tool_open'); },[]);
+  useEffect(()=>{ // load profile to prefill regime or future defaults
+    fetch('/api/profile', { credentials:'include'}).then(r=>r.json()).then(j=>{ if(j.ok && j.profile){ setProfile(j.profile); if(j.profile.regime_fiscale) setFocusRegime(j.profile.regime_fiscale); } }).catch(()=>{});
+  },[]);
 
   return (
     <div className="card">

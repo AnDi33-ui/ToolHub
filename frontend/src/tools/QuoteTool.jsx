@@ -21,7 +21,9 @@ export function QuoteTool(){
   const [error,setError] = React.useState('');
   const [highDiscConfirmed,setHighDiscConfirmed] = React.useState(false);
   const [loadingTemplates,setLoadingTemplates] = React.useState(false);
+  const [profile,setProfile] = React.useState(null);
   React.useEffect(()=>{ apiFetch('/api/auth/me').then(j=>{ if(j.ok) setUser(j.user); }).catch(()=>{}); },[]);
+  React.useEffect(()=>{ if(user){ apiFetch('/api/profile').then(j=>{ if(j.ok && j.profile){ setProfile(j.profile); if(j.profile.aliquota_iva_default!=null) setVat(j.profile.aliquota_iva_default); if(j.profile.currency_default) setCurrency(j.profile.currency_default); if(j.profile.note_footer_default && !note) setNote(j.profile.note_footer_default); if(j.profile.ragione_sociale) setCompany(c=>({...c,name:j.profile.ragione_sociale})); if(j.profile.indirizzo) setCompany(c=>({...c,address:j.profile.indirizzo})); } }).catch(()=>{}); } },[user]);
   function addItem(){ setItems(prev=> [...prev,{desc:'',qty:1,price:0}]); }
   function update(i,field,val){ setItems(prev=> prev.map((it,idx)=> idx===i? {...it,[field]: field==='desc'? val : val}:it)); }
   function remove(i){ setItems(prev=> prev.filter((_,idx)=> idx!==i)); }

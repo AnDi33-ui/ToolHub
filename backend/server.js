@@ -128,6 +128,26 @@ db.serialize(() => {
   // New tables: clients & invoices
   db.run(`CREATE TABLE IF NOT EXISTS clients (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,name TEXT NOT NULL,vat TEXT,address TEXT,notes TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   db.run(`CREATE TABLE IF NOT EXISTS invoices (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,client_id INTEGER,number TEXT,total REAL,currency TEXT,status TEXT DEFAULT 'draft',payload TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+  // Business profile (one row per user)
+  db.run(`CREATE TABLE IF NOT EXISTS business_profile (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER UNIQUE,
+    regime_fiscale TEXT,
+    piva TEXT,
+    codice_fiscale TEXT,
+    ragione_sociale TEXT,
+    indirizzo TEXT,
+    cap TEXT,
+    citta TEXT,
+    provincia TEXT,
+    nazione TEXT,
+    aliquota_iva_default REAL,
+    currency_default TEXT,
+    note_footer_default TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_business_profile_user ON business_profile(user_id)`);
 });
 
 // Sessions: legacy map (for old x-session-token) + persistent table
@@ -297,6 +317,48 @@ app.get('/api/auth/me', requireUser, async (req, res) => {
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
+});
+
+// ---- Business Profile ----
+function normalizeProfileInput(body){
+  const allowedRegimi = ['forfettario','ordinario','flat'];
+  const profile = {};
+  if(body.regime_fiscale && allowedRegimi.includes(String(body.regime_fiscale).toLowerCase())) profile.regime_fiscale = String(body.regime_fiscale).toLowerCase();
+  if(body.piva) profile.piva = String(body.piva).trim().toUpperCase();
+  if(body.codice_fiscale) profile.codice_fiscale = String(body.codice_fiscale).trim().toUpperCase();
+  const strFields = ['ragione_sociale','indirizzo','cap','citta','provincia','nazione','note_footer_default','currency_default'];
+  strFields.forEach(f=>{ if(body[f]!=null) profile[f]= String(body[f]).slice(0,180); });
+  if(body.aliquota_iva_default!=null){ const v = Number(body.aliquota_iva_default); if(!isNaN(v) && v>=0 && v<=100) profile.aliquota_iva_default = v; }
+  return profile;
+}
+
+app.get('/api/profile', requireUser, async (req,res)=>{
+  try {
+    const rows = await allAsync('SELECT * FROM business_profile WHERE user_id=?',[req.userId]);
+    if(!rows.length) return res.json({ ok:true, profile:null });
+    res.json({ ok:true, profile: rows[0] });
+  } catch(e){ res.status(500).json({ ok:false, error:e.message }); }
+});
+
+app.put('/api/profile', requireUser, async (req,res)=>{
+  try {
+    const data = normalizeProfileInput(req.body||{});
+    if(!Object.keys(data).length) return res.status(400).json({ ok:false, error:'No valid fields' });
+    // Upsert logic
+    const existing = await allAsync('SELECT id FROM business_profile WHERE user_id=?',[req.userId]);
+    const now = new Date().toISOString();
+    if(existing.length){
+      const sets = Object.keys(data).map(k=> `${k}=?`);
+      sets.push('updated_at=?');
+      await runAsync(`UPDATE business_profile SET ${sets.join(',')} WHERE user_id=?`, [...Object.values(data), now, req.userId]);
+    } else {
+      data.user_id = req.userId; data.created_at = now; data.updated_at = now;
+      const cols = Object.keys(data); const placeholders = cols.map(()=>'?');
+      await runAsync(`INSERT INTO business_profile (${cols.join(',')}) VALUES (${placeholders.join(',')})`, Object.values(data));
+    }
+    const out = await allAsync('SELECT * FROM business_profile WHERE user_id=?',[req.userId]);
+    res.json({ ok:true, profile: out[0] });
+  } catch(e){ res.status(500).json({ ok:false, error:e.message }); }
 });
 
 // Profile update (name, marketing opt-in)

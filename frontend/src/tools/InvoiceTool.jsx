@@ -26,6 +26,7 @@ export function InvoiceTool(){
   const [upgrading,setUpgrading]=React.useState(false);
   const noClients = clients.length===0;
   const [loadingData,setLoadingData] = React.useState(true);
+  const [profile,setProfile] = React.useState(null);
 
   function updateItem(id,field,val){ setItems(prev=> prev.map(it=> it.id===id? {...it,[field]: field==='desc'? val : Number(val)}:it)); }
   function addItem(){ setItems(prev=> [...prev,{id:Math.random().toString(36).slice(2),desc:'',qty:1,price:0}]); }
@@ -34,8 +35,22 @@ export function InvoiceTool(){
 
   async function loadClients(){ try{ const j = await apiFetch('/api/clients'); if(j.ok){ setClients(j.items); if(!clientId && j.items.length) setClientId(String(j.items[0].id)); } }catch(e){ if(e.status===401){ setLoginRequired(true);} else { window.ToolHubToast?.('Errore caricamento clienti','error'); }} }
   async function loadInvoices(){ try{ const j = await apiFetch('/api/invoices'); if(j.ok) setInvoices(j.items); }catch(e){ if(e.status===401){ setLoginRequired(true);} else { window.ToolHubToast?.('Errore caricamento fatture','error'); }} }
+  async function loadProfile(){
+    try {
+      const j = await apiFetch('/api/profile');
+      if(j.ok){
+        setProfile(j.profile);
+        if(j.profile){
+          if(j.profile.aliquota_iva_default!=null) setTaxRate(Number(j.profile.aliquota_iva_default));
+          if(j.profile.currency_default) setCurrency(j.profile.currency_default);
+          if(j.profile.ragione_sociale){ /* could map to company block later */ }
+          if(j.profile.note_footer_default && !notes) setNotes(j.profile.note_footer_default);
+        }
+      }
+    } catch(e){ /* silent */ }
+  }
 
-  async function checkAuth(){ setAuthError(''); setLoadingData(true); try{ const j=await apiFetch('/api/auth/me'); if(j.ok){ setAuthChecked(true); setLoginRequired(false); await Promise.all([loadClients(), loadInvoices()]); setLoadingData(false); return; } } catch(e){ if(e.status===401){ let legacy=null; try{ legacy=localStorage.getItem('sessionToken'); }catch(_){ } if(legacy){ setUpgrading(true); try { const j2=await apiFetch('/api/auth/me',{ headers:{'x-session-token':legacy}}); if(j2.ok){ setAuthChecked(true); setLoginRequired(false); setUpgrading(false); await Promise.all([loadClients(), loadInvoices()]); setLoadingData(false); return; } } catch(err){ /* ignore */ } setUpgrading(false); setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return; } setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return;} setAuthError(e.message||'Errore auth'); setAuthChecked(true); setLoadingData(false); }}
+  async function checkAuth(){ setAuthError(''); setLoadingData(true); try{ const j=await apiFetch('/api/auth/me'); if(j.ok){ setAuthChecked(true); setLoginRequired(false); await Promise.all([loadClients(), loadInvoices(), loadProfile()]); setLoadingData(false); return; } } catch(e){ if(e.status===401){ let legacy=null; try{ legacy=localStorage.getItem('sessionToken'); }catch(_){ } if(legacy){ setUpgrading(true); try { const j2=await apiFetch('/api/auth/me',{ headers:{'x-session-token':legacy}}); if(j2.ok){ setAuthChecked(true); setLoginRequired(false); setUpgrading(false); await Promise.all([loadClients(), loadInvoices(), loadProfile()]); setLoadingData(false); return; } } catch(err){ /* ignore */ } setUpgrading(false); setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return; } setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return;} setAuthError(e.message||'Errore auth'); setAuthChecked(true); setLoadingData(false); }}
   React.useEffect(()=>{ checkAuth(); },[]);
 
   function validateClient(){ if(!cName.trim()) return 'Nome cliente obbligatorio'; return null; }
