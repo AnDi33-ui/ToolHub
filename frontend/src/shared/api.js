@@ -23,7 +23,10 @@ export async function apiFetch(path, { method='GET', headers={}, body, json=true
   }
   // Legacy token upgrade header (only if no cookie session yet) - optional
   if(auth){
-    try{ if(!document.cookie.includes('sid=') && localStorage.getItem('sessionToken')) finalHeaders['x-session-token'] = localStorage.getItem('sessionToken'); }catch(_){ }
+    try {
+      const legacy = localStorage.getItem('sessionToken');
+      if(legacy) finalHeaders['x-session-token'] = legacy; // sempre allegato se esiste
+    } catch(_){ }
   }
   let attempt=0; let lastErr;
   while(true){
