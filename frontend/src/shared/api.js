@@ -33,7 +33,13 @@ export async function apiFetch(path, { method='GET', headers={}, body, json=true
       const data = json && isJson ? await res.json() : (json? {}: await res.text());
       if(!res.ok){
         // 401 handling: surface a recognizable error for caller to trigger login UI
-        if(res.status===401){ throw new ApiError(data.error || 'Non autenticato', 401, 'UNAUTH'); }
+        if(res.status===401){
+          try {
+            if(typeof window!== 'undefined' && window.dispatchEvent){
+              window.dispatchEvent(new CustomEvent('toolhub:unauthorized',{ detail:{ path, status:401, ts:Date.now() }}));
+            }
+          } catch(_){ }
+          throw new ApiError(data.error || 'Non autenticato', 401, 'UNAUTH'); }
         throw new ApiError(data.error || ('HTTP '+res.status), res.status);
       }
       return data;

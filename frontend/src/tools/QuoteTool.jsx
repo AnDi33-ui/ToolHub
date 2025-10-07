@@ -25,7 +25,21 @@ export function QuoteTool(){
   const [loadingTemplates,setLoadingTemplates] = React.useState(false);
   const { profile, refresh: refreshProfile } = useBusinessProfile(!!user);
   const [profileEditorOpen,setProfileEditorOpen] = React.useState(false);
+  // Prima verifica sessione
   React.useEffect(()=>{ apiFetch('/api/auth/me').then(j=>{ if(j.ok) setUser(j.user); }).catch(()=>{}); },[]);
+
+  // Listener globale per scadenza sessione (evita messaggi duplicati immediati)
+  React.useEffect(()=>{
+    function onUnauthorized(e){
+      // Se l'utente risultava loggato ma arriva un 401, forziamo un re-check una volta sola
+      setUser(u=> u); // trigger no-op state consistency
+      if(!user){ return; }
+      // Tentativo silenzioso di refresh
+      apiFetch('/api/auth/me').then(j=>{ if(!j.ok){ setUser(null); window.ToolHubToast?.('Sessione scaduta','warn'); } }).catch(()=>{ setUser(null); window.ToolHubToast?.('Sessione scaduta','warn'); });
+    }
+    window.addEventListener('toolhub:unauthorized', onUnauthorized);
+    return ()=> window.removeEventListener('toolhub:unauthorized', onUnauthorized);
+  },[user]);
   const appliedDefaultsRef = React.useRef(false);
   React.useEffect(()=>{ if(profile && !appliedDefaultsRef.current){ if(profile.aliquota_iva_default!=null) setVat(profile.aliquota_iva_default); if(profile.currency_default) setCurrency(profile.currency_default); if(profile.note_footer_default && !note) setNote(profile.note_footer_default); if(profile.ragione_sociale) setCompany(c=>({...c,name:profile.ragione_sociale})); if(profile.indirizzo) setCompany(c=>({...c,address:profile.indirizzo})); appliedDefaultsRef.current=true; } },[profile,note]);
   function addItem(){ setItems(prev=> [...prev,{desc:'',qty:1,price:0}]); }

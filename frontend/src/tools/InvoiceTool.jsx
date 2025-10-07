@@ -63,6 +63,16 @@ export function InvoiceTool(){
   async function checkAuth(){ setAuthError(''); setLoadingData(true); try{ const j=await apiFetch('/api/auth/me'); if(j.ok){ setAuthChecked(true); setLoginRequired(false); await Promise.all([loadClients(), loadInvoices(), refreshProfile()]); setLoadingData(false); return; } } catch(e){ if(e.status===401){ let legacy=null; try{ legacy=localStorage.getItem('sessionToken'); }catch(_){ } if(legacy){ setUpgrading(true); try { const j2=await apiFetch('/api/auth/me',{ headers:{'x-session-token':legacy}}); if(j2.ok){ setAuthChecked(true); setLoginRequired(false); setUpgrading(false); await Promise.all([loadClients(), loadInvoices(), refreshProfile()]); setLoadingData(false); return; } } catch(err){ /* ignore */ } setUpgrading(false); setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return; } setLoginRequired(true); setAuthChecked(true); setLoadingData(false); return;} setAuthError(e.message||'Errore auth'); setAuthChecked(true); setLoadingData(false); }}
   React.useEffect(()=>{ checkAuth(); },[]);
 
+  // Listener globale per 401 per evitare stati incoerenti (es. profilo aperto dopo scadenza cookie)
+  React.useEffect(()=>{
+    function onUnauthorized(){
+      if(loginRequired) return; // già gestito
+      apiFetch('/api/auth/me').then(j=>{ if(!j.ok){ setLoginRequired(true); window.ToolHubToast?.('Sessione scaduta','warn'); } }).catch(()=>{ setLoginRequired(true); window.ToolHubToast?.('Sessione scaduta','warn'); });
+    }
+    window.addEventListener('toolhub:unauthorized', onUnauthorized);
+    return ()=> window.removeEventListener('toolhub:unauthorized', onUnauthorized);
+  },[loginRequired]);
+
   function validateClient(){ if(!cName.trim()) return 'Nome cliente obbligatorio'; return null; }
   async function saveClient(){ if(loginRequired){ setStatus('Login richiesto'); return; } const vErr=validateClient(); if(vErr){ setCStatus(vErr); window.ToolHubToast?.(vErr,'warn'); return; } setCStatus('Salvataggio...'); try{ const payload={ name:cName.trim(), vat:cVat.trim(), address:cAddress.trim() }; const j=await apiFetch('/api/clients',{ method:'POST', body:payload }); if(j.ok){ track('client_create',{ id:j.id }); window.ToolHubToast?.('Cliente creato','success'); setCStatus('Creato'); setCName(''); setCVat(''); setCAddress(''); const wasEmpty = clients.length===0; await loadClients(); if(wasEmpty) setShowClientForm(false); setTimeout(()=>setCStatus(''),900);} else { setCStatus('Errore'); window.ToolHubToast?.('Errore creazione cliente','error'); } }catch(e){ if(e.status===401){ setLoginRequired(true); setCStatus('Login richiesto'); window.ToolHubToast?.('Sessione scaduta','warn'); } else { setCStatus(e.message||'Errore rete'); window.ToolHubToast?.(e.message||'Errore rete','error'); } } }
   function rowsValid(){ return items.length>0 && items.every(r=> r.desc.trim() && (r.qty>0) && (r.price>=0)); }
