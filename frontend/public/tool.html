@@ -24,8 +24,16 @@
 
 
 
-<script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+<script>
+// Permettiamo ?devreact=1 per caricare versione development di React (debug errori hook)
+(function(){
+  var params=new URLSearchParams(location.search);
+  var dev=params.get('devreact')==='1';
+  var reactCdnBase='https://unpkg.com/react@17/umd/';
+  var scripts=[ dev? 'react.development.js':'react.production.min.js', dev? 'react-dom.development.js':'react-dom.production.min.js' ];
+  scripts.forEach(function(file){ var s=document.createElement('script'); s.crossOrigin=''; s.src=reactCdnBase+file; document.write(s.outerHTML); });
+})();
+</script>
 </head>
   <body class="preload">
     <nav class="navbar">
@@ -73,6 +81,7 @@ window.API_BASE=window.API_BASE||'http://localhost:3000';
   function renderTool(c){ try { ReactDOM.render(React.createElement(c), root); root.dataset.mounted='1'; document.body.classList.add('app-ready'); } catch(err){ showError('Errore render', err); } }
   function mount(){
     attempts++;
+    if(window.__toolhubMounted || root.dataset.mounted==='1'){ return; }
     if(!window.React || !window.ReactDOM){ if(attempts>120){ showError('React non caricato (CDN bloccato?)'); return; } return setTimeout(mount,50); }
     try {
   const tools = window.ToolHubTools || {};
@@ -95,7 +104,7 @@ window.API_BASE=window.API_BASE||'http://localhost:3000';
   s.src='/dist/'+file+'?v='+(Date.now?Date.now():Math.random());
   s.async=true;
   s.onerror=()=>showError('Impossibile caricare bundle: '+s.src);
-  s.onload=()=>console.log('[tool-loader] bundle caricato', file, 'elapsed', elapsed());
+  s.onload=()=>{ console.log('[tool-loader] bundle caricato', file, 'elapsed', elapsed()); window.__toolhubMounted=true; };
   document.body.appendChild(s);
   mount();
 })();
